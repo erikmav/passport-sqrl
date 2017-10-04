@@ -1,0 +1,19 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+  // The number of spaces a tab is equal to.
+  "editor.tabSize": 2,
+
+  // Specifies the folder path containing the tsserver and lib*.d.ts files to use.
+  "typescript.tsdk": "node_modules\\typescript\\lib",
+
+  // Configure glob patterns for excluding files and folders.
+
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "out/**": true
+  }
+}

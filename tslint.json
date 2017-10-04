@@ -1,0 +1,18 @@
+{
+    "extends": "tslint:recommended",
+    "rules": {
+        "max-line-length": false,
+        "max-classes-per-file": false,
+        "arrow-parens": false,
+        "no-angle-bracket-type-assertion": false,
+        "no-trailing-whitespace": false,
+        "prefer-const": false,
+        "quotemark": false,
+        "no-console": false,
+        "no-empty": false,
+        "object-literal-sort-keys": false,
+        "object-literal-shorthand": false,
+        "trailing-comma": false
+    },
+    "exclude": [ "node_modules" ]
+}

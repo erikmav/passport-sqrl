@@ -1,0 +1,1 @@
+Visual Studio Code integration metadata, allowing us to execute the project.

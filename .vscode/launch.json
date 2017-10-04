@@ -1,0 +1,67 @@
+{
+    "version": "0.2.0",
+    "compounds": [ ],
+    "configurations": [
+        {
+            "name": "IntegrationTestSite",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceRoot}/out/testSite/RunTestSiteServer.js",
+            "stopOnEntry": false,
+            "args": [],
+            "cwd": "${workspaceRoot}/out/testSite",
+            "preLaunchTask": "build",
+            "runtimeExecutable": null,
+            "runtimeArgs": [
+                "--nolazy"
+            ],
+            "env": {
+                "NODE_ENV": "development"
+            },
+            "console": "internalConsole",
+            "sourceMaps": false,
+            "outFiles": []
+        },
+        {
+            "name": "Profile",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceRoot}/out/testSite/RunTestSiteServer.js",
+            "stopOnEntry": false,
+            "args": [],
+            "cwd": "${workspaceRoot}/out/testSite",
+            "preLaunchTask": "build",
+            "runtimeExecutable": null,
+            "runtimeArgs": [
+                "--nolazy",
+                "--prof"
+            ],
+            "env": {
+                "NODE_ENV": "development"
+            },
+            "console": "integratedTerminal",
+            "sourceMaps": false,
+            "outFiles": []
+        },
+        {
+            "name": "Attach to Test Site",
+            "type": "node",
+            "request": "attach",
+            "port": 5858,
+            "address": "localhost",
+            "restart": false,
+            "sourceMaps": false,
+            "outFiles": [],
+            "localRoot": "${workspaceRoot}/out/testSite",
+            "remoteRoot": null
+        },
+        {
+            "name": "Mocha Test",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceRoot}/out/testSiteTests",
+            "port": 5858,
+            "sourceMaps": false
+        }
+    ]
+}
