@@ -104,7 +104,7 @@ gulp.task('transpile-typescript', [], () => {
         .pipe(sourcemaps.init())
         .pipe(gulpTypescript.createProject('tsconfig.json')())
         .pipe(sourcemaps.write('.'))
-        .pipe(gulp.dest(Paths.SharedOutput));
+        .pipe(gulp.dest(Paths.OutputRoot));
 });
 
 // http://andrewconnell.com/blog/running-mocha-tests-with-visual-studio-code
