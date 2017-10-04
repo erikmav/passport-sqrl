@@ -3,7 +3,7 @@ A PassportJS (https://github.com/jaredhanson/passport) implementation of the SQR
 
 ```diff
 + NOTE: This repo is under construction.
-- The real NPM package has not ben published yet.
+- The real NPM package has not been published yet.
 ```
 
 The code for this repo is written in TypeScript, with the JavaScript outputs transcoded to ES6 for modern Node.js compatibility. The resulting output is published as an NPM module 'passport-sqrl'.
@@ -13,7 +13,7 @@ The code for this repo is written in TypeScript, with the JavaScript outputs tra
 1. Install Git from https://git-scm.com/download/win (for Windows), or https://git-scm.com/download for other operating systems. Be sure you're using at least version 2.14.1 to get an important security patch.
 1. Install Node.js from https://nodejs.org (click the Current button to get the latest - you need at least version 8.4).
 
-* We recommend visual Studio Code from https://www.visualstudio.com/products/code-vs - run `code .` in the repo root folder.
+* We recommend Visual Studio Code from https://www.visualstudio.com/products/code-vs - run `code .` in the repo root folder.
 * The `Setup.cmd` command should be run after any pull from GitHub to install latest packages.
 * The `Init.cmd` command (which is run by Setup.cmd or can be run separately) sets up some useful command shortcuts, such as `pull` for `git pull`, `nb <shortname>` and `cb <shortname>` to create or change to a local topic branch to work in (of the form dev/your-github-alias/shortname). See aliases.txt for all the commands.
 * Submit pull requests on GitHub at https://github.com/erikma/passport-sqrl
