@@ -22,11 +22,11 @@ const del = require('del');
 // http://stackoverflow.com/questions/25038014/how-do-i-copy-directories-recursively-with-gulp#25038015
 // 'finishedAsyncTaskCallback' param is optional and is the Gulp completion callback for asynchronous tasks.
 // If specified it will be called after this method completes.
-gulp.copy = function(src, dest, finishedAsyncTaskCallback) {
-    return pump([
-        gulp.src(src, { base:"." }),
-        gulp.dest(dest)
-    ], finishedAsyncTaskCallback);
+gulp.copy = (src, dest, finishedAsyncTaskCallback) => {
+  return pump([
+    gulp.src(src, { base:"." }),
+    gulp.dest(dest)
+  ], finishedAsyncTaskCallback);
 };
 
 // Gulp wrapper for running Mocha tests.
@@ -39,32 +39,32 @@ const linecorr = require('gulp-line-ending-corrector');
 
 // Keep important paths here for reference. Only use Paths.Xxx in code below instead of duplicating these strings.
 var Paths = {
-    SourceRoot: 'src',
+  SourceRoot: 'src',
 
-    // Common code used across main code, unit tests, integration tests.
-    PassportSqrlRoot: 'src/passport-sqrl',
-    PassportSqrlAll: 'src/passport-sqrl/**',
+  // Common code used across main code, unit tests, integration tests.
+  PassportSqrlRoot: 'src/passport-sqrl',
+  PassportSqrlAll: 'src/passport-sqrl/**',
 
-    // Passport-SQRL unit tests.
-    PassportSqrlTests: 'src/SqrlTests',
-    PassportSqrlTestsAll: 'src/SqrlTests/**',
+  // Passport-SQRL unit tests.
+  PassportSqrlTests: 'src/SqrlTests',
+  PassportSqrlTestsAll: 'src/SqrlTests/**',
     
-    // Integration test web site hosted via Node.js.
-    TestSiteRoot: 'src/testSite',
-    TestSiteAll: 'src/testSite/**',
-    TestSiteTests: 'src/testSiteClient',
+  // Integration test web site hosted via Node.js.
+  TestSiteRoot: 'src/testSite',
+  TestSiteAll: 'src/testSite/**',
+  TestSiteTests: 'src/testSiteClient',
 
-    // Build output locations
-    OutputRoot: 'out',
+  // Build output locations
+  OutputRoot: 'out',
     
-    PassportSqrlTestsOutput: 'out/SqrlTests',
+  PassportSqrlTestsOutput: 'out/SqrlTests',
 
-    TestSiteOutput: 'out/testSite',
-    TestSiteTestsOutput: 'out/testSiteClient',
+  TestSiteOutput: 'out/testSite',
+  TestSiteTestsOutput: 'out/testSiteClient',
 
-    InitialSetupOutput: 'out/InitialSetup',
-    InitialSetupOutputShared: 'out/InitialSetup/shared',
-    InitialSetupOutputTools: 'out/InitialSetup/tools',
+  InitialSetupOutput: 'out/InitialSetup',
+  InitialSetupOutputShared: 'out/InitialSetup/shared',
+  InitialSetupOutputTools: 'out/InitialSetup/tools',
 };
 
 // ---------------------------------------------------------------------------
@@ -73,38 +73,38 @@ var Paths = {
 // integration.
 // ---------------------------------------------------------------------------
 gulp.task('default', [
-    'clean',
+  'clean',
     
-    'tslint',
-    'transpile-typescript',
+  'tslint',
+  'transpile-typescript',
+  'copy-test-site-static-files',
+  'run-passport-sqrl-unit-tests',
 
-    //'copy-test-site-static-files'
-    //'run-passport-sqrl-unit-tests',
-    //'run-test-site-integration-tests',
+  //'run-test-site-integration-tests',
 ]);
 gulp.task('build', ['default']);
 
 gulp.task('clean', () => {
-    // Clean up output directories.
-    // .sync() version forces completion before returning from task, making
-    // it complete before the next task in a dependency list.
-    return del.sync([ Paths.OutputRoot ]);
+  // Clean up output directories.
+  // .sync() version forces completion before returning from task, making
+  // it complete before the next task in a dependency list.
+  return del.sync([ Paths.OutputRoot ]);
 });
 
 gulp.task("tslint", [], () => {
-    return gulp.src(Paths.SourceRoot + "/**/*.ts")
-        .pipe(tslint({
-            formatter: "verbose"
-        }))
-        .pipe(tslint.report())
+  return gulp.src(Paths.SourceRoot + "/**/*.ts")
+      .pipe(tslint({
+        formatter: "verbose"
+      }))
+      .pipe(tslint.report())
 });
 
 gulp.task('transpile-typescript', [], () => {
-    return gulp.src(Paths.SourceRoot + '/**/*.ts')
-        .pipe(sourcemaps.init())
-        .pipe(gulpTypescript.createProject('tsconfig.json')())
-        .pipe(sourcemaps.write('.'))
-        .pipe(gulp.dest(Paths.OutputRoot));
+  return gulp.src(Paths.SourceRoot + '/**/*.ts')
+      .pipe(sourcemaps.init())
+      .pipe(gulpTypescript.createProject('tsconfig.json')())
+      .pipe(sourcemaps.write('.'))
+      .pipe(gulp.dest(Paths.OutputRoot));
 });
 
 // http://andrewconnell.com/blog/running-mocha-tests-with-visual-studio-code
@@ -115,15 +115,15 @@ gulp.task('run-test-site-integration-tests', ['transpile-typescript', 'copy-test
 
 // http://andrewconnell.com/blog/running-mocha-tests-with-visual-studio-code
 gulp.task('run-passport-sqrl-unit-tests', ['transpile-typescript'], () => {
-  return gulp.src(Paths.PassportSqrlTests + '/**/*.tests.js', { read: false })
+  return gulp.src(Paths.PassportSqrlTestsOutput + '/**/*.js', { read: false })
     .pipe(mocha({ reporter: 'spec' }));
 });
 
 gulp.task('copy-test-site-static-files', [], () => {
-    return gulp.src([
-            Paths.TestSiteRoot + '/**/*.ico',
-            Paths.TestSiteRoot + '/**/*.html',
-            Paths.TestSiteRoot + '/**/*.css',
-        ])
-        .pipe(gulp.dest(Paths.TestSiteOutput));
+  return gulp.src([
+      Paths.TestSiteRoot + '/**/*.ico',
+      Paths.TestSiteRoot + '/**/*.html',
+      Paths.TestSiteRoot + '/**/*.css',
+    ])
+    .pipe(gulp.dest(Paths.TestSiteOutput));
 });

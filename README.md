@@ -2,7 +2,7 @@
 A PassportJS (https://github.com/jaredhanson/passport) implementation of the SQRL authentication protocol (https://www.grc.com/sqrl/sqrl.htm).
 
 ```diff
-+ NOTE: This repo is under construction.
+- NOTE: This repo is under construction.
 - The real NPM package has not been published yet.
 ```
 
