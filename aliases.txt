@@ -1,0 +1,12 @@
+n = notepad $*
+master = git checkout master
+cb = git checkout dev/%__GitUserName%/$*
+nb = git checkout master && git checkout -b dev/%__GitUserName%/$*
+pull = git pull
+branch = git branch
+stat = git status
+mmerge = git checkout master && git merge dev/%__GitUserName%/$* --squash && git commit
+push = for /F "usebackq" %b in (`git rev-parse --abbrev-ref HEAD`) do git push --set-upstream origin %b
+.. = cd ..
+... = cd .. && cd ..
+.... = cd .. && cd .. & cd ..
