@@ -14,8 +14,8 @@
   "man": "",
   "start": "node out/testSite/RunTestServer.js",
   "dependencies": {
-    "body-parser": "^1.18.2",
-    "passport": "^0.4.0"
+    "passport": "^0.4.0",
+    "passport-strategy": "^1.0.0"
   },
   "devDependencies": {
     "@types/body-parser": "^1.16.5",
@@ -25,11 +25,12 @@
     "@types/mocha": "^2.2.43",
     "@types/node": "^7.0.43",
     "@types/passport": "^0.3.4",
+    "@types/passport-strategy": "^0.2.31",
     "@types/request": "^2.0.3",
     "@types/request-promise-native": "^1.0.6",
     "@types/rimraf": "^2.0.2",
+    "body-parser": "^1.18.2",
     "chai": "^4.1.2",
-    "codelyzer": "~3.1.1",
     "del": "^3.0.0",
     "gulp": "^3.9.1",
     "gulp-line-ending-corrector": "^1.0.1",
