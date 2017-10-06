@@ -17,13 +17,20 @@ export class SqrlUrl {
  */
 export class SqrlUrlFactory {
   /**
-   * Creates a SQRL URL from full metadata.
+   * Creates a SQRL URL from full "nut" metadata.
    * @param secure Whether the server is using TLS, which maps to the 'sqrl://' or 'qrl://' schemes.
    * @param domain The site domain, e.g. "www.foo.com"
    * @param pathString Optional path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
-   * @param serverData The opaque, unique server data generated for this URL.
+   * @param serverNut The opaque, unique server data generated for this URL, passed as the nut= query parameter.
+   * @param domainExtension When positive, specifies the value to place into the x= query parameter that tells the client how many characters of the pathString to include in its server key hash.
    */
-  public static create(secure: boolean, domain: string, pathString: string | null, serverData: string | Buffer): string {
+  public static create(
+      secure: boolean,
+      domain: string,
+      pathString: string | null,
+      serverNut: string | Buffer,
+      domainExtension?: number)
+      : string {
     let scheme = secure ? 'sqrl' : 'qrl';
 
     if (!pathString) {
@@ -34,11 +41,18 @@ export class SqrlUrlFactory {
       pathString = '/' + pathString;
     }
 
-    if (pathString.length === 0 || pathString[pathString.length - 1] !== '?') {
-      pathString = pathString + '?';
+    if (pathString.endsWith('?')) {
+      pathString = pathString.substring(0, pathString.length - 1);
     }
 
-    return `${scheme}://${domain}${pathString}${serverData}`;
+    // domainExt includes the starting / of the path; start calculating after pathString has that prefix.
+    let domainExt = '';
+    if (pathString.length > 0 && domainExtension && domainExtension > 0) {
+      domainExtension = Math.min(domainExtension, pathString.length);
+      domainExt = `&x=${domainExtension}`;
+    }
+
+    return `${scheme}://${domain}${pathString}?nut=${serverNut}${domainExt}`;
   }
 
   private secure: boolean;
@@ -59,9 +73,19 @@ export class SqrlUrlFactory {
 
   /**
    * Creates a SQRL URL from the provided unique server data.
-   * @param serverData The opaque, unique server data generated for this URL.
+   * @param serverNut The opaque, unique server data generated for this URL, passed as the nut= query parameter.
    */
-  public create(serverData: string | Buffer): string {
-    return SqrlUrlFactory.create(this.secure, this.domain, this.pathString, serverData);
+  public createFromNut(serverNut: string | Buffer): string {
+    return SqrlUrlFactory.create(this.secure, this.domain, this.pathString, serverNut);
+  }
+
+  /**
+   * Creates a SQRL URL from the provided unique server data.
+   * @param pathString Path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
+   * @param serverNut The opaque, unique server data generated for this URL, passed as the nut= query parameter.
+   * @param domainExtension When positive, specifies the value to place into the x= query parameter that tells the client how many characters of the pathString to include in its server key hash.
+   */
+  public createFromPathAndNut(pathString: string, serverNut: string | Buffer, domainExtension?: number): string {
+    return SqrlUrlFactory.create(this.secure, this.domain, pathString, serverNut, domainExtension);
   }
 }
