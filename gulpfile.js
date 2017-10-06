@@ -122,6 +122,7 @@ gulp.task('run-passport-sqrl-unit-tests', ['transpile-typescript'], () => {
 gulp.task('copy-test-site-static-files', [], () => {
   return gulp.src([
       Paths.TestSiteRoot + '/**/*.ico',
+      Paths.TestSiteRoot + '/**/*.png',
       Paths.TestSiteRoot + '/**/*.html',
       Paths.TestSiteRoot + '/**/*.css',
     ])

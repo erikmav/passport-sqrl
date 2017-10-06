@@ -14,7 +14,7 @@
   "man": "",
   "start": "node out/testSite/RunTestServer.js",
   "dependencies": {
-    "base64-url": "^2.0.0",
+    "base64url": "^2.0.0",
     "passport": "^0.4.0",
     "passport-strategy": "^1.0.0"
   },
@@ -30,6 +30,7 @@
     "@types/request": "^2.0.3",
     "@types/request-promise-native": "^1.0.6",
     "@types/rimraf": "^2.0.2",
+    "@types/serve-favicon": "^2.2.29",
     "body-parser": "^1.18.2",
     "chai": "^4.1.2",
     "del": "^3.0.0",
@@ -46,6 +47,7 @@
     "request-debug": "^0.2.0",
     "request-promise-native": "^1.0.4",
     "rimraf": "^2.6.2",
+    "serve-favicon": "^2.4.5",
     "ts-node": "~3.2.0",
     "tslint": "^5.7.0",
     "typescript": "^2.5.2"

@@ -13,7 +13,7 @@ import * as express from 'express';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
-// import * as favicon from 'serve-favicon';
+import * as favicon from 'serve-favicon';
 import { ILogger } from './Logging';
 
 export class TestSiteHandler {
@@ -25,7 +25,7 @@ export class TestSiteHandler {
     // From examples at https://github.com/feathersjs/feathers-typescript and
     // https://docs.feathersjs.com/api/express.html
     const app = express()
-      // .use(favicon(__dirname + '/WebSite/favicon.ico'))  // First to handle quickly without passing through other middleware layers
+      .use(favicon(webSiteDir + '/favicon.ico'))  // First to handle quickly without passing through other middleware layers
       .use(bodyParser.json())  // Needed for parsing bodies (login)
       .use(bodyParser.urlencoded({extended: true}))  // Needed for parsing bodies (login)
       .use(express.static(webSiteDir));  // Serve static scripts and assets. Must come after non-file (e.g. REST) middleware

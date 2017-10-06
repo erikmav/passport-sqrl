@@ -1,4 +1,4 @@
-import * as base64url from 'base64-url';
+import base64url from 'base64url';
 
 /**
  * Creates SQRL URLs. The static methods may be used directly, or else an instance
