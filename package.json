@@ -14,6 +14,7 @@
   "man": "",
   "start": "node out/testSite/RunTestServer.js",
   "dependencies": {
+    "base64-url": "^2.0.0",
     "passport": "^0.4.0",
     "passport-strategy": "^1.0.0"
   },
