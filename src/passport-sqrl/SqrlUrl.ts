@@ -1,17 +1,6 @@
 import * as base64url from 'base64-url';
 
 /**
- * Implements a SQRL URL generator and parser.
- * Based on https://www.grc.com/sqrl/protocol.htm
- * Unit tests are in SqrlUrl.tests.ts.
- */
-export class SqrlUrl {
-  constructor(url: string) {
-
-  }
-}
-
-/**
  * Creates SQRL URLs. The static methods may be used directly, or else an instance
  * of this class may be instantiated with configuration information to reduce
  * the number of parameters a caller has to pass.
