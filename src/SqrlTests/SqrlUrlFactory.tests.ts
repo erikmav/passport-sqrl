@@ -48,9 +48,9 @@ describe('SqrlUrlFactory', () => {
       url = factory.create("secure3", "/login");
       assert.equal(url, 'qrl://foo.com/login?nut=secure3');
 
-      factory = new SqrlUrlFactory(true, 'foo.com', '/login', "Friendly!");
+      factory = new SqrlUrlFactory(true, 'foo.com', '/login', 6, "Friendly!");
       url = factory.create("secure4");
-      assert.equal(url, 'sqrl://foo.com/login?nut=secure4&sfn=RnJpZW5kbHkh');
+      assert.equal(url, 'sqrl://foo.com/login?nut=secure4&x=6&sfn=RnJpZW5kbHkh');
     });
   });
 });

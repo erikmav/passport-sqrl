@@ -42,6 +42,7 @@ export class SQRLStrategy extends Strategy {
         config.secure,
         config.localDomainName,
         config.urlPath,
+        config.domainExtension,
         config.serverFriendlyName);
 
     if (!config.nutGenerator) {
@@ -104,7 +105,7 @@ export class SQRLStrategyConfig {
    * when generating a per-site key pair. This does not need to be
    * specified if the base domain name is sufficient as a site key.
    * It should be specified if the URL path includes a portion
-   * that produces teh semantics of a separate site, e.g. on GitHub
+   * that produces the semantics of a separate site, e.g. on GitHub
    * the /username or /username/reponame if a unique key is needed
    * for such paths.
    */
