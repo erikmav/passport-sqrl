@@ -1,6 +1,34 @@
 import base64url from 'base64url';
 
 /**
+ * Converts the bytes in the buffer to base64url and trims trailing '='
+ * characters per the SQRL specification.
+ */
+export function toSqrlBase64(buf: Buffer): string {
+  return trimEqualsChars(buf.toString('base64'));
+}
+
+/** Trims any tail '=' characters, returning the trimmed string. */
+export function trimEqualsChars(s: string): string {
+  // Avoid regular expressions - low performance.
+  let len = s.length;
+  if (!s || len === 0) {
+    return s;
+  }
+
+  let i = len - 1;
+  while (i >= 0) {
+    if (s[i] === '=') {
+      i--;
+    } else {
+      break;
+    }
+  }
+
+  return s.substring(0, i + 1);
+}
+
+/**
  * Creates SQRL URLs. The static methods may be used directly, or else an instance
  * of this class may be instantiated with configuration information to reduce
  * the number of parameters a caller has to pass.
@@ -49,7 +77,14 @@ export class SqrlUrlFactory {
       sfn = '&sfn=' + base64url.encode(serverFriendlyName);
     }
 
-    return `${scheme}://${domain}${pathString}?nut=${serverNut}${domainExt}${sfn}`;
+    let nut: string;
+    if (serverNut instanceof Buffer) {
+      nut = toSqrlBase64(serverNut);
+    } else {
+      nut = serverNut;
+    }
+
+    return `${scheme}://${domain}${pathString}?nut=${nut}${domainExt}${sfn}`;
   }
 
   private secure: boolean;

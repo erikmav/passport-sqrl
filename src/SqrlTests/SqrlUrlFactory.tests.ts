@@ -1,7 +1,7 @@
 // Unit test suite for SqrlUrlFactory code.
 
 import { assert } from "chai";
-import { SqrlUrlFactory } from '../passport-sqrl/SqrlUrlFactory';
+import { SqrlUrlFactory, toSqrlBase64, trimEqualsChars } from '../passport-sqrl/SqrlUrlFactory';
 
 describe('SqrlUrlFactory', () => {
   describe('StaticUrlCreationChecks', () => {
@@ -13,24 +13,24 @@ describe('SqrlUrlFactory', () => {
       assert.equal(url, 'sqrl://www.foo.com/sqrlLogin?nut=secure2');
 
       url = SqrlUrlFactory.create(true, 'www.foo.com', new Buffer("secure3"), 'sqrlLogin2?');
-      assert.equal(url, 'sqrl://www.foo.com/sqrlLogin2?nut=secure3');
+      assert.equal(url, 'sqrl://www.foo.com/sqrlLogin2?nut=c2VjdXJlMw');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', new Buffer("secure4"), '');
+      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure4", '');
       assert.equal(url, 'sqrl://www.foo.com?nut=secure4');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', new Buffer("secure5"), '', 1);
+      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure5", '', 1);
       assert.equal(url, 'sqrl://www.foo.com?nut=secure5');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', new Buffer("secure6"), 'someuser', 1);
+      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure6", 'someuser', 1);
       assert.equal(url, 'sqrl://www.foo.com/someuser?nut=secure6&x=1');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', new Buffer("secure7"), 'someuser', 1000);
+      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure7", 'someuser', 1000);
       assert.equal(url, 'sqrl://www.foo.com/someuser?nut=secure7&x=9');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', new Buffer("secure8"), '/someuser?', 1000);
+      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure8", '/someuser?', 1000);
       assert.equal(url, 'sqrl://www.foo.com/someuser?nut=secure8&x=9');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', new Buffer("secure9"), /*path*/undefined, /*domainExt*/undefined, "Foo");
+      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure9", /*path*/undefined, /*domainExt*/undefined, "Foo");
       assert.equal(url, 'sqrl://www.foo.com?nut=secure9&sfn=Rm9v');
     });
   });
@@ -51,6 +51,42 @@ describe('SqrlUrlFactory', () => {
       factory = new SqrlUrlFactory(true, 'foo.com', '/login', "Friendly!");
       url = factory.create("secure4");
       assert.equal(url, 'sqrl://foo.com/login?nut=secure4&sfn=RnJpZW5kbHkh');
+    });
+  });
+});
+
+describe('trimEqualsChars', () => {
+  describe('trimEqualsCharsCases', () => {
+    it('should return the appropriate result strings for various inputs to trimEqualsChars', () => {
+      let s = trimEqualsChars('');
+      assert.equal(s, '');
+
+      s = trimEqualsChars('=');
+      assert.equal(s, '');
+
+      s = trimEqualsChars('====');
+      assert.equal(s, '');
+
+      s = trimEqualsChars('abc');
+      assert.equal(s, 'abc');
+
+      s = trimEqualsChars('==abc==de');
+      assert.equal(s, '==abc==de');
+
+      s = trimEqualsChars('abc==');
+      assert.equal(s, 'abc');
+    });
+  });
+});
+
+describe('toSqrlBase64', () => {
+  describe('toSqrlBase64Cases', () => {
+    it('should return the appropriate result = trimmed base64url strings for various inputs to toSqrlBase64', () => {
+      let s = toSqrlBase64(new Buffer([0, 1, 2, 3]));
+      assert.equal(s, 'AAECAw');  // Regular base64 encding is 'AAAECAw=='
+
+      s = toSqrlBase64(new Buffer([0, 1, 2, 3, 4, 5]));
+      assert.equal(s, 'AAECAwQF');  // Even multiple of 6 bits for encoding, base64 string same as trimmed result.
     });
   });
 });

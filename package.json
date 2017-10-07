@@ -6,8 +6,11 @@
   "repository": "https://github.com/erikma/passport-sqrl.git",
   "author": "Erik Mavrinac (https://github.com/erikma)",
   "tags": [
+    "sqrl",
     "passport",
-    "nodejs"
+    "passportjs",
+    "nodejs",
+    "node"
   ],
   "files": [],
   "bin": {},
@@ -15,6 +18,7 @@
   "start": "node out/testSite/RunTestServer.js",
   "dependencies": {
     "base64url": "^2.0.0",
+    "body-parser": "^1.18.2",
     "passport": "^0.4.0",
     "passport-strategy": "^1.0.0"
   },
@@ -31,7 +35,6 @@
     "@types/request-promise-native": "^1.0.6",
     "@types/rimraf": "^2.0.2",
     "@types/serve-favicon": "^2.2.29",
-    "body-parser": "^1.18.2",
     "chai": "^4.1.2",
     "del": "^3.0.0",
     "gulp": "^3.9.1",
@@ -41,7 +44,6 @@
     "gulp-tslint": "^8.1.2",
     "gulp-typescript": "^3.2.2",
     "mocha": "^3.5.3",
-    "protractor": "~5.1.2",
     "pump": "^1.0.2",
     "request": "^2.82.0",
     "request-debug": "^0.2.0",

@@ -12,22 +12,39 @@ import * as bodyParser from 'body-parser';
 import * as express from 'express';
 import * as fs from 'fs';
 import * as http from 'http';
+import * as passport from 'passport';
 import * as path from 'path';
 import * as favicon from 'serve-favicon';
+import { SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
 import { ILogger } from './Logging';
 
 export class TestSiteHandler {
   private testSiteServer: http.Server;
+  private sqrlPassportStrategy: SQRLStrategy;
 
   constructor(log: ILogger, port: number = 5858) {
     let webSiteDir = path.join(__dirname, 'WebSite');
+    const loginRoute = '/sqrlLogin';
 
-    // From examples at https://github.com/feathersjs/feathers-typescript and
-    // https://docs.feathersjs.com/api/express.html
+    this.sqrlPassportStrategy = new SQRLStrategy(<SQRLStrategyConfig> {
+        secure: false,
+        localDomainName: 'localhost',
+        urlPath: loginRoute,
+        serverFriendlyName: 'SQRL Test!'
+      },
+      (clientPublicKey, done) => {
+        done();
+      });
+    passport.use(this.sqrlPassportStrategy);
+
     const app = express()
       .use(favicon(webSiteDir + '/favicon.ico'))  // First to handle quickly without passing through other middleware layers
       .use(bodyParser.json())  // Needed for parsing bodies (login)
       .use(bodyParser.urlencoded({extended: true}))  // Needed for parsing bodies (login)
+      .post(loginRoute, passport.authenticate('sqrl', {
+        successRedirect: '/',
+        failureRedirect: loginRoute
+      }))
       .use(express.static(webSiteDir));  // Serve static scripts and assets. Must come after non-file (e.g. REST) middleware
 
     this.testSiteServer = http.createServer(app);
