@@ -2,7 +2,7 @@
 
 import { assert } from "chai";
 import * as express from 'express';
-import { SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
+import { SQRLClientRequestInfo, SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
 
 describe('SQRLStrategy', () => {
   describe('getSqrlUrlNoNutGenerator', () => {
@@ -16,7 +16,7 @@ describe('SQRLStrategy', () => {
           domainExtension: 6,
           serverFriendlyName: 'friends!',
         },
-        (clientPublicKey: string, done: any): void => {
+        (clientRequestInfo: SQRLClientRequestInfo, done: any): void => {
           authCalled = true;
         });
 
@@ -42,7 +42,7 @@ describe('SQRLStrategy', () => {
             return "nuts!";
           }
         },
-        (clientPublicKey: string, done: any): void => {
+        (clientRequestInfo: SQRLClientRequestInfo, done: any): void => {
           authCalled = true;
         });
 

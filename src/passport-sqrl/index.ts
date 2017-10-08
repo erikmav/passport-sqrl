@@ -10,7 +10,7 @@ import { SqrlUrlFactory } from './SqrlUrlFactory';
  * @param clientPublicKey A string version of the client's primary public key.
  * @param done This is a Connect callback that should be called on completion of callback handling.
  */
-export type AuthCallback = (clientPublicKey: string, done: any) => void;
+export type AuthCallback = (clientRequestInfo: SQRLClientRequestInfo, done: any) => void;
 
 /** The main SQRL passport middleware. */
 export class SQRLStrategy extends Strategy {
@@ -81,6 +81,52 @@ export class SQRLStrategy extends Strategy {
 
   private generateRandomNut(): string | Buffer {
     return crypto.randomBytes(16 /*128 bits*/);
+  }
+}
+
+/**
+ * Parameters derived from the POST or GET parameters to the SQRL auth route.
+ * See https://www.grc.com/sqrl/protocol.htm particularly "How to form the POST verb's body."
+ */
+export class SQRLClientRequestInfo {
+  /** The requested SQRL operation. */
+  public sqrlCommand: string;
+  
+  /**
+   * The primary identity public key that the client wishes to use to contact this
+   * server in the future. It may not correspond to a public key previously received
+   * at this server if previously presented - but now deprecated - public keys are
+   * presented in previousIdentotyPublicKey.
+   * 
+   * This value is a SQRL-base64 (base64 minus any tail '=' padding characters) string.
+   * Use the primaryIdentityPublicKeyBuf() function to retrieve a Buffer version of this string.
+   * 
+   * This public key has been successfully validated against the corresponding client-provided
+   * signature in the request.
+   */
+  public primaryIdentityPublicKey: string;
+
+  /**
+   * The previous identity public key that the client wishes to deprecate in favor of
+   * the public key presented in primaryIdentityPublicKey.
+   */
+  public previousIdentityPublicKey: string;
+
+  /**
+   * The 
+   * See the server unlock protocol discussion at https://www.grc.com/sqrl/idlock.htm .
+   */
+  public serverUnlockPublicKey: string;
+
+  /**
+   * 
+   * See the server unlock protocol discussion at https://www.grc.com/sqrl/idlock.htm .
+   */
+  public serverVerifyUnlockPublicKey: string;
+
+  /** Provides a Buffer version of primaryIdentityPublicKey. */
+  public primaryIdentityPublicKeyBuf(): Buffer {
+    return Buffer.from(this.primaryIdentityPublicKey, 'base64');
   }
 }
 
