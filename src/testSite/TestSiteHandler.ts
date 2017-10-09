@@ -15,7 +15,7 @@ import * as http from 'http';
 import * as passport from 'passport';
 import * as path from 'path';
 import * as favicon from 'serve-favicon';
-import { SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
+import { AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
 import { ILogger } from './Logging';
 
 export class TestSiteHandler {
@@ -32,10 +32,12 @@ export class TestSiteHandler {
         urlPath: loginRoute,
         serverFriendlyName: 'SQRL Test!'
       },
-      (clientPublicKey, done) => {
-        done();
+      (clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> => {
+        return Promise.resolve(<AuthCompletionInfo> {
+          user: { name: 'bob' },
+          info: 'info!'
+        });
       });
-    passport.use(this.sqrlPassportStrategy);
 
     const app = express()
       .use(favicon(webSiteDir + '/favicon.ico'))  // First to handle quickly without passing through other middleware layers

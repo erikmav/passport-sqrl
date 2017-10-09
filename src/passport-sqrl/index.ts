@@ -3,14 +3,38 @@
 import * as crypto from 'crypto';
 import * as express from 'express';
 import { Strategy } from 'passport-strategy';
+import { SqrlBodyParser } from './SqrlBodyParser';
 import { SqrlUrlFactory } from './SqrlUrlFactory';
+
+/** Returned from a completed AuthCallback promise. */
+export class AuthCompletionInfo {
+  /**
+   * When present, indicates an internal error when processing the auth callback.
+   * Results in a 500 Server Error HTTP response.
+   */
+  public err?: Error;
+
+  /**
+   * When present, indicates authentication success and provides the user record retrieved
+   * or created during the authentication request.
+   */
+  public user?: any;
+
+  /**
+   * When user is present, this is optional additional user information, e.g. a profile.
+   * When user and err are undefined this should be set to provide information to
+   * return to the client in a 401 challenge response; it can be either a string or an object
+   * having 'message' and 'type' fields.
+   */
+  public info?: any;
+}
 
 /**
  * An authentication callback called from the SQRL passport strategy object.
- * @param clientPublicKey A string version of the client's primary public key.
- * @param done This is a Connect callback that should be called on completion of callback handling.
+ * On its returned Promise completion the result is used to feed the response to the caller.
+ * @param clientRequestInfo Information parsed and verified from the information provided by the client.
  */
-export type AuthCallback = (clientRequestInfo: SQRLClientRequestInfo, done: any) => void;
+export type AuthCallback = (clientRequestInfo: ClientRequestInfo) => Promise<AuthCompletionInfo>;
 
 /** The main SQRL passport middleware. */
 export class SQRLStrategy extends Strategy {
@@ -62,8 +86,8 @@ export class SQRLStrategy extends Strategy {
   }
 
   /**
-   * Called by the passport middleware when this strategy is configured on an
-   * HTTP POST route.
+   * Called by the PassportJS middleware when this strategy is configured on an
+   * HTTP POST route and a client call is received.
    */
   public authenticate(req: express.Request, options?: any): void {
     let params: any;
@@ -72,13 +96,40 @@ export class SQRLStrategy extends Strategy {
     } else {
       params = req.params;  // Allow GET calls with URL params.
     }
-  
+
     // Expected params from https://www.grc.com/sqrl/protocol.htm "POST Queries" section.
     let client = params.client;  // base64url encoded client arguments consisting of name1=value1&name2=value2&... format
     let server = params.server;  // base64url encoded original SQRL URL, or base64url encoded name1=value1&name2=value2&... format
-    let ids = params.ids;  // 
+    let ids = params.ids;
+
+    let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseBodyParts(
+        client,
+        server,
+        ids,
+        undefined /*TODO*/,
+        undefined/*TODO*/);
+
+    this.authCallback(clientRequestInfo)
+        .then((authCompletion: AuthCompletionInfo) => {
+          console.log('erik: authCallback completed');
+          if (authCompletion.err) {
+            this.error(authCompletion.err);
+          } else if (!authCompletion.user) {
+            this.fail(authCompletion.info);
+          } else {
+            this.success(authCompletion.user, authCompletion.info);
+          }
+        })
+        .catch((reason: any) => this.error(reason));
+
+    // Note on return here the asynchronous callback+promise above may not have returned.
+    // We can't perform an await here as this is not an async function.
+    // (Important for unit testing - have to poll for the end result or timeout.)
+    // In PassportJS and Connect+Express, the eventual call to this.success()/fail()/error()
+    // causes a response on the web site.
   }
 
+  /** Default implementation of nut generation - creates a 128-bit random number. */
   private generateRandomNut(): string | Buffer {
     return crypto.randomBytes(16 /*128 bits*/);
   }
@@ -88,7 +139,7 @@ export class SQRLStrategy extends Strategy {
  * Parameters derived from the POST or GET parameters to the SQRL auth route.
  * See https://www.grc.com/sqrl/protocol.htm particularly "How to form the POST verb's body."
  */
-export class SQRLClientRequestInfo {
+export class ClientRequestInfo {
   /** The requested SQRL operation. */
   public sqrlCommand: string;
   
@@ -107,18 +158,24 @@ export class SQRLClientRequestInfo {
   public primaryIdentityPublicKey: string;
 
   /**
-   * The previous identity public key that the client wishes to deprecate in favor of
-   * the public key presented in primaryIdentityPublicKey.
+   * Zero or more previous identity public keys that the client wishes to deprecate
+   * in favor of the public key presented in primaryIdentityPublicKey. This
+   * array my be undefined or have zero entries (which is the typical case
+   * since identity changes are intended to be rare amongst SQRL clients).
    */
-  public previousIdentityPublicKey: string;
+  public previousIdentityPublicKeys: string[] | undefined;
 
   /**
-   * The 
+   * The public part of an identity key pair that must be retained by the server and
+   * passed back to the client if it needs to perform an identity re-keying operation.
+   * 
    * See the server unlock protocol discussion at https://www.grc.com/sqrl/idlock.htm .
    */
   public serverUnlockPublicKey: string;
 
   /**
+   * The public part of a key that must be retained by the server and used to verify
+   * the signature of any possible future Unlock Request.
    * 
    * See the server unlock protocol discussion at https://www.grc.com/sqrl/idlock.htm .
    */
@@ -130,6 +187,7 @@ export class SQRLClientRequestInfo {
   }
 }
 
+/** Provided to the SQRL strategy constructor to provide configuration information. */
 export class SQRLStrategyConfig {
   /** Whether the site uses TLS and the 'sqrl://' (as opposed to 'qrl://') URL scheme should be generated. */
   public secure: boolean;
