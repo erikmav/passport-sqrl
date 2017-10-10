@@ -111,7 +111,6 @@ export class SQRLStrategy extends Strategy {
 
     this.authCallback(clientRequestInfo)
         .then((authCompletion: AuthCompletionInfo) => {
-          console.log('erik: authCallback completed');
           if (authCompletion.err) {
             this.error(authCompletion.err);
           } else if (!authCompletion.user) {
@@ -140,14 +139,25 @@ export class SQRLStrategy extends Strategy {
  * See https://www.grc.com/sqrl/protocol.htm particularly "How to form the POST verb's body."
  */
 export class ClientRequestInfo {
-  /** The requested SQRL operation. */
+  /**
+   * The requested SQRL operation. One of the various SQRL client commands
+   * (https://www.grc.com/sqrl/semantics.htm):
+   *   'query' - initial identity validation to a site, or a later round of attempt to find a previous
+   *             identity key that the server recognizes;
+   *   'ident' - requests the server to accept the user's identity.
+   *   'disable' - requests the server to disable the user's identity, typically for reasons
+   *               of potential hacking;
+   *   'enable' - reverse of 'disable'
+   *   'remove' - requests the server to remove the user's identity (which must have previously been
+   *              disabled) from the server's identity store.
+   */
   public sqrlCommand: string;
   
   /**
    * The primary identity public key that the client wishes to use to contact this
    * server in the future. It may not correspond to a public key previously received
    * at this server if previously presented - but now deprecated - public keys are
-   * presented in previousIdentotyPublicKey.
+   * presented one per 'query' command in previousIdentityPublicKey.
    * 
    * This value is a SQRL-base64 (base64 minus any tail '=' padding characters) string.
    * Use the primaryIdentityPublicKeyBuf() function to retrieve a Buffer version of this string.
@@ -158,12 +168,12 @@ export class ClientRequestInfo {
   public primaryIdentityPublicKey: string;
 
   /**
-   * Zero or more previous identity public keys that the client wishes to deprecate
-   * in favor of the public key presented in primaryIdentityPublicKey. This
-   * array my be undefined or have zero entries (which is the typical case
-   * since identity changes are intended to be rare amongst SQRL clients).
+   * Optional previous identity public key that the client wishes to deprecate
+   * in favor of the public key presented in primaryIdentityPublicKey. Typically
+   * this value is absent since identity changes are intended to be rare amongst
+   * SQRL clients.
    */
-  public previousIdentityPublicKeys: string[] | undefined;
+  public previousIdentityPublicKey?: string;
 
   /**
    * The public part of an identity key pair that must be retained by the server and
@@ -171,7 +181,7 @@ export class ClientRequestInfo {
    * 
    * See the server unlock protocol discussion at https://www.grc.com/sqrl/idlock.htm .
    */
-  public serverUnlockPublicKey: string;
+  public serverUnlockPublicKey?: string;
 
   /**
    * The public part of a key that must be retained by the server and used to verify
@@ -179,7 +189,62 @@ export class ClientRequestInfo {
    * 
    * See the server unlock protocol discussion at https://www.grc.com/sqrl/idlock.htm .
    */
-  public serverVerifyUnlockPublicKey: string;
+  public serverVerifyUnlockPublicKey?: string;
+
+  /**
+   * Optional field sent by the client (in its 'ins=' field) providing
+   * a hash of the server-sent value (in the server's 'sin=' field) using
+   * the primary identity key.
+   */
+  public indexSecret?: string;
+
+  /**
+   * Optional field sent by the client (in its 'ins=' field) providing
+   * a hash of the server-sent value (in the server's 'sin=' field) using
+   * the deprecated identity key (if any) specified in this client request's
+   * previousIdentityPublicKey ('pidk=') field.
+   */
+  public previousIndexSecret?: string;
+  
+  /**
+   * Optional flag from the client ('sqrlonly' in its opt= option flag list, see
+   * https://www.grc.com/sqrl/semantics.htm) in a non-query command, requesting
+   * that the server disable other allowed authentication methods in favor of only SQRL.
+   * The server should ignore this field value in query commands.
+   */
+  public useSqrlIdentityOnly: boolean;
+
+  /**
+   * Optional flag from the client ('hardlock' in its opt= option flag list, see
+   * https://www.grc.com/sqrl/semantics.htm) in a non-query command, requesting
+   * that the server disable security question style alternate identity recovery methods.
+   * The server should ignore this field value in query commands.
+   */
+  public hardLockSqrlUse: boolean;
+
+  /**
+   * Optional flag from the client ('cps' in its opt= option flag list, see
+   * https://www.grc.com/sqrl/semantics.htm) in an 'ident' command, requesting
+   * that the server disable security question style alternate identity recovery methods.
+   * The server should ignore this field value in query commands.
+   */
+  public clientProvidedSession: boolean;
+
+  /**
+   * Optional flag from the client ('suk' in its opt= option flag list, see
+   * https://www.grc.com/sqrl/semantics.htm) in a query command, requesting
+   * that the server return its stored Session Unlock Key value to the client
+   * so it can issue a re-key request.
+   */
+  public returnSessionUnlockKey: boolean;
+
+  /**
+   * Optional client information (the 'btn=' information field) containing the
+   * user's response to a previously presented server "ask" presented to the client.
+   * This value, if presemt, is 1, 2, or 3 corresponding the ask selection buttons
+   * 1 or 2, or 3 for the question having been dismissed without answering.
+   */
+  public serverAskResponseSelection?: number;
 
   /** Provides a Buffer version of primaryIdentityPublicKey. */
   public primaryIdentityPublicKeyBuf(): Buffer {

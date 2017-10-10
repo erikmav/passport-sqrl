@@ -76,7 +76,6 @@ describe('SQRLStrategy', () => {
           localDomainName: 'domain.com'
         },
         (clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> => {
-          console.log('erik: auth callback');
           requestInfo = clientRequestInfo;
           return Promise.resolve(<AuthCompletionInfo> {
             user: { name: 'bob' },
@@ -100,7 +99,6 @@ describe('SQRLStrategy', () => {
         // assert.equal(requestInfo
         assert.isFalse(sqrl.errorCalled, 'Base error() should not have been called');
         assert.isFalse(sqrl.failCalled, 'Base fail() should not have been called');
-        console.log(`erik: checking successCalled ${sqrl.successCalled}`);
         assert.isTrue(sqrl.successCalled, 'Base success() should have been called');
         assert.equal('bob', sqrl.successUser.name);
         assert.equal('info!', sqrl.successInfo);
@@ -131,7 +129,6 @@ class MockSQRLStrategy extends SQRLStrategy {
 
   public success(user: any, info: any) {
     this.successCalled = true;
-    console.log(`erik: ${this.successCalled}`);
     this.successUser = user;
     this.successInfo = info;
   }
