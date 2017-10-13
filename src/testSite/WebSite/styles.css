@@ -5,22 +5,24 @@ h1 {
   font-size: 250%;
 }
 h2, h3 {
-  color: #888;
+  color: #333;
   font-family: Arial, Helvetica, sans-serif;
   font-weight: lighter;
 }
 body {
   margin: 0;
-  background-color: #222;
+  background-color: #FFF;
 }
 body, input[text], button {
-  color: #AAA;
+  color: #222;
   font-family: Cambria, Georgia;
 }
-.qr-code {
-  width: 400;
+.qr-code > svg {
+  width: 2000px;
   max-width: 30%;
   max-height: 30%;
+  color: #000;
+  background-color: #FFF;
 }
 /* everywhere else */
 * {

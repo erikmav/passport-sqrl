@@ -1,5 +1,5 @@
 # Passport-SQRL
-A PassportJS (https://github.com/jaredhanson/passport) implementation of the SQRL authentication protocol (https://www.grc.com/sqrl/sqrl.htm).
+A [PassportJS](https://github.com/jaredhanson/passport) implementation of the [SQRL authentication protocol](https://www.grc.com/sqrl/sqrl.htm).
 
 ```diff
 - NOTE: This repo is under construction.

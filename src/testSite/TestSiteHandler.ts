@@ -12,6 +12,7 @@
 import * as bodyParser from 'body-parser';
 import * as ejs from 'ejs';
 import * as express from 'express';
+import * as expressLayouts from 'express-ejs-layouts';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as passport from 'passport';
@@ -44,6 +45,7 @@ export class TestSiteHandler {
 
     const app = express()
       .set('view engine', 'ejs')
+      .use(expressLayouts)
       .use(favicon(webSiteDir + '/favicon.ico'))  // First to handle quickly without passing through other middleware layers
       .use(bodyParser.json())  // Needed for parsing bodies (login)
       .use(bodyParser.urlencoded({extended: true}))  // Needed for parsing bodies (login)
