@@ -125,6 +125,7 @@ gulp.task('copy-test-site-static-files', [], () => {
       Paths.TestSiteRoot + '/**/*.png',
       Paths.TestSiteRoot + '/**/*.html',
       Paths.TestSiteRoot + '/**/*.css',
+      Paths.TestSiteRoot + '/**/*.ejs',
     ])
     .pipe(gulp.dest(Paths.TestSiteOutput));
 });
