@@ -102,12 +102,7 @@ export class SQRLStrategy extends Strategy {
     let server = params.server;  // base64url encoded original SQRL URL, or base64url encoded name1=value1&name2=value2&... format
     let ids = params.ids;
 
-    let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseBodyParts(
-        client,
-        server,
-        ids,
-        undefined /*TODO*/,
-        undefined/*TODO*/);
+    let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseBodyFields(params);
 
     this.authCallback(clientRequestInfo)
         .then((authCompletion: AuthCompletionInfo) => {
@@ -139,6 +134,9 @@ export class SQRLStrategy extends Strategy {
  * See https://www.grc.com/sqrl/protocol.htm particularly "How to form the POST verb's body."
  */
 export class ClientRequestInfo {
+  /** The client's SQRL protocol revision. */
+  public protocolVersion: number;
+
   /**
    * The requested SQRL operation. One of the various SQRL client commands
    * (https://www.grc.com/sqrl/semantics.htm):
@@ -199,7 +197,7 @@ export class ClientRequestInfo {
   public indexSecret?: string;
 
   /**
-   * Optional field sent by the client (in its 'ins=' field) providing
+   * Optional field sent by the client (in its 'pins=' field) providing
    * a hash of the server-sent value (in the server's 'sin=' field) using
    * the deprecated identity key (if any) specified in this client request's
    * previousIdentityPublicKey ('pidk=') field.

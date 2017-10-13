@@ -3,6 +3,7 @@
 import { assert } from "chai";
 import * as express from 'express';
 import { AuthCallback, AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
+import { MockSQRLClient } from './MockSqrlClient';
 
 describe('SQRLStrategy', () => {
   describe('getSqrlUrlNoNutGenerator', () => {
@@ -83,14 +84,12 @@ describe('SQRLStrategy', () => {
           });
         });
 
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=1234&sfn=Hello');
+
       // TODO: Change request body to a POST set to the values a real client would send.
       sqrl.authenticate(<express.Request> {
         method: "POST",
-        body: {
-          client: "client1",
-          server: "server1",
-          ids: "ids1"
-        }
+        body: client.generatePostBody('query')
       });
 
       // authenticate() logic is aync and may not be done by the time we get here.
