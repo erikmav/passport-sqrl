@@ -18,12 +18,20 @@ body, input[text], button {
   font-family: Cambria, Georgia;
 }
 .qr-code > svg {
-  width: 2000px;
-  max-width: 30%;
-  max-height: 30%;
   color: #000;
   background-color: #FFF;
 }
+@media (orientation: landscape) {
+  .qr-code > svg {
+    width: 30%;
+  }
+}
+@media (orientation: portrait) {
+  .qr-code > svg {
+    width: 100%;
+  }
+}
+
 /* everywhere else */
 * {
   font-family: Arial, Helvetica, sans-serif;
