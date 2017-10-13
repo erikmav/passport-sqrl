@@ -66,8 +66,7 @@ export class SQRLStrategy extends Strategy {
         config.secure,
         config.localDomainName,
         config.urlPath,
-        config.domainExtension,
-        config.serverFriendlyName);
+        config.domainExtension);
 
     if (!config.nutGenerator) {
       this.nutGenerator = this.generateRandomNut;
@@ -277,12 +276,6 @@ export class SQRLStrategyConfig {
    * for such paths.
    */
   public domainExtension?: number;
-
-  /**
-   * Optional server friendly name for display in the SQRL client.
-   * This value maps to the sfn= query parameter on generated SQRL URLs.
-   */
-  public serverFriendlyName?: string;
 
   /**
    * An optional "nut" generator. When undefined, a cryptographically

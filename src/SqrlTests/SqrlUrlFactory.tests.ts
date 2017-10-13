@@ -30,8 +30,8 @@ describe('SqrlUrlFactory', () => {
       url = SqrlUrlFactory.create(true, 'www.foo.com', "secure8", '/someuser?', 1000);
       assert.equal(url, 'sqrl://www.foo.com/someuser?nut=secure8&x=9');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure9", /*path*/undefined, /*domainExt*/undefined, "Foo");
-      assert.equal(url, 'sqrl://www.foo.com?nut=secure9&sfn=Rm9v');
+      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure9", /*path*/undefined, /*domainExt*/undefined);
+      assert.equal(url, 'sqrl://www.foo.com?nut=secure9');
     });
   });
 
@@ -48,9 +48,9 @@ describe('SqrlUrlFactory', () => {
       url = factory.create("secure3", "/login");
       assert.equal(url, 'qrl://foo.com/login?nut=secure3');
 
-      factory = new SqrlUrlFactory(true, 'foo.com', '/login', 6, "Friendly!");
+      factory = new SqrlUrlFactory(true, 'foo.com', '/login', 6);
       url = factory.create("secure4");
-      assert.equal(url, 'sqrl://foo.com/login?nut=secure4&x=6&sfn=RnJpZW5kbHkh');
+      assert.equal(url, 'sqrl://foo.com/login?nut=secure4&x=6');
     });
   });
 });

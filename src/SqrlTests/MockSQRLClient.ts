@@ -346,7 +346,7 @@ describe('SQRLClient', () => {
 
   describe('genAndParseClient', () => {
     it('should be able to generate and parse the client body to the same result', () => {
-      let mockClient = new MockSQRLClient('sqrl://foo.com/login?nut=1234&sfn=Foo', /*numPreviousIdentities:*/1);
+      let mockClient = new MockSQRLClient('sqrl://foo.com/login?nut=1234', /*numPreviousIdentities:*/1);
       mockClient.useSqrlIdentityOnly = true;
       mockClient.hardLockSqrlUse = true;
       mockClient.clientProvidedSession = true;

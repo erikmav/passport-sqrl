@@ -34,7 +34,6 @@ export class TestSiteHandler {
         secure: false,
         localDomainName: 'localhost',
         urlPath: sqrlLoginRoute,
-        serverFriendlyName: 'SQRL Test!'
       },
       (clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> => {
         return Promise.resolve(<AuthCompletionInfo> {

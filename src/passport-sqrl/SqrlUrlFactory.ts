@@ -41,15 +41,13 @@ export class SqrlUrlFactory {
    * @param serverNut The opaque, unique server data generated for this URL, passed as the nut= query parameter.
    * @param pathString Optional path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
    * @param domainExtension When positive, specifies the value to place into the x= query parameter that tells the client how many characters of the pathString to include in its server key hash.
-   * @param serverFriendlyName Optional server friendly name for display in the SQRL client. When specified, adds the sfn= query parameter.
    */
   public static create(
       secure: boolean,
       domain: string,
       serverNut: string | Buffer,
       pathString?: string,
-      domainExtension?: number,
-      serverFriendlyName?: string)
+      domainExtension?: number)
       : string {
     let scheme = secure ? 'sqrl' : 'qrl';
 
@@ -72,11 +70,6 @@ export class SqrlUrlFactory {
       domainExt = `&x=${domainExtension}`;
     }
 
-    let sfn = '';
-    if (serverFriendlyName && serverFriendlyName.length > 0) {
-      sfn = '&sfn=' + base64url.encode(serverFriendlyName);
-    }
-
     let nut: string;
     if (serverNut instanceof Buffer) {
       nut = toSqrlBase64(serverNut);
@@ -84,14 +77,13 @@ export class SqrlUrlFactory {
       nut = serverNut;
     }
 
-    return `${scheme}://${domain}${pathString}?nut=${nut}${domainExt}${sfn}`;
+    return `${scheme}://${domain}${pathString}?nut=${nut}${domainExt}`;
   }
 
   private secure: boolean;
   private domain: string;
   private pathString: string | undefined;
   private domainExtension?: number;
-  private serverFriendlyName: string | undefined;
   
   /**
    * Creates a SQRL URL factory with static configuration information.
@@ -100,15 +92,12 @@ export class SqrlUrlFactory {
    * @param pathString Optional path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
    * @param domainExtension When positive, specifies the value to place into the x= query parameter
    *   that tells the client how many characters of the pathString to include in its server key hash.
-   * @param serverFriendlyName Optional server friendly name for display in the SQRL client.
-   *   When specified, adds the sfn= query parameter.
    */
-  constructor(secure: boolean, domain: string, pathString?: string, domainExtension?: number, serverFriendlyName?: string) {
+  constructor(secure: boolean, domain: string, pathString?: string, domainExtension?: number) {
     this.secure = secure;
     this.domain = domain;
     this.pathString = pathString;
     this.domainExtension = domainExtension;
-    this.serverFriendlyName = serverFriendlyName;
   }
 
   /**
@@ -126,7 +115,6 @@ export class SqrlUrlFactory {
         this.domain,
         serverNut,
         pathString || this.pathString,
-        domainExtension || this.domainExtension,
-        this.serverFriendlyName);
+        domainExtension || this.domainExtension);
   }
 }

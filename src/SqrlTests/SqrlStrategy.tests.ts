@@ -15,7 +15,6 @@ describe('SQRLStrategy', () => {
           localDomainName: 'domain.com',
           urlPath: '/login',
           domainExtension: 6,
-          serverFriendlyName: 'friends!',
         },
         (clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> => {
           authCalled = true;
@@ -25,7 +24,7 @@ describe('SQRLStrategy', () => {
       let url = sqrl.getSqrlUrl(<express.Request> { });
       assert.equal(url.substring(0, 27), 'qrl://domain.com/login?nut=');
       // 22 characters of base64 for 128 bits - should be random
-      assert.equal(url.substring(27 + 22), "&x=6&sfn=ZnJpZW5kcyE");
+      assert.equal(url.substring(27 + 22), "&x=6");
 
       assert.isFalse(authCalled);
     });
@@ -39,7 +38,6 @@ describe('SQRLStrategy', () => {
           secure: true,
           localDomainName: 'domain.com',
           urlPath: '/login',
-          serverFriendlyName: 'enemy',
           nutGenerator: (req: express.Request): string | Buffer => {
             return "nuts!";
           }
@@ -50,7 +48,7 @@ describe('SQRLStrategy', () => {
         });
 
       let url = sqrl.getSqrlUrl(<express.Request> { });
-      assert.equal(url, 'sqrl://domain.com/login?nut=nuts!&sfn=ZW5lbXk');
+      assert.equal(url, 'sqrl://domain.com/login?nut=nuts!');
 
       assert.isFalse(authCalled);
     });
@@ -84,7 +82,7 @@ describe('SQRLStrategy', () => {
           });
         });
 
-      let client = new MockSQRLClient('sqrl://foo.com/login?nut=1234&sfn=Hello');
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=1234');
 
       // TODO: Change request body to a POST set to the values a real client would send.
       sqrl.authenticate(<express.Request> {
