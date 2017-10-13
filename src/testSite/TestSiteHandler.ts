@@ -4,7 +4,8 @@
 //
 // Browser page URI space:
 //   / : Home page, hosted from index.html
-//   /sqrl : POST endpoint for SQRL login
+//   /login : GET for login page
+//   /sqrlLogin : POST endpoint for SQRL login
 //
 // Logging: Bunyan logs in use for general logging to the console.
 
@@ -26,12 +27,13 @@ export class TestSiteHandler {
 
   constructor(log: ILogger, port: number = 5858) {
     let webSiteDir = path.join(__dirname, 'WebSite');
-    const loginRoute = '/login';
+    const sqrlLoginRoute = '/sqrlLogin';
+    const loginPageRoute = '/login';
 
     this.sqrlPassportStrategy = new SQRLStrategy(<SQRLStrategyConfig> {
         secure: false,
         localDomainName: 'localhost',
-        urlPath: loginRoute,
+        urlPath: sqrlLoginRoute,
         serverFriendlyName: 'SQRL Test!'
       },
       (clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> => {
@@ -46,7 +48,7 @@ export class TestSiteHandler {
       .use(favicon(webSiteDir + '/favicon.ico'))  // First to handle quickly without passing through other middleware layers
       .use(bodyParser.json())  // Needed for parsing bodies (login)
       .use(bodyParser.urlencoded({extended: true}))  // Needed for parsing bodies (login)
-      .get(loginRoute, (req, res) => {
+      .get(loginPageRoute, (req, res) => {
         let sqrlUrl = this.sqrlPassportStrategy.getSqrlUrl(req);
         let qrSvg = qr.imageSync(sqrlUrl, { type: 'svg', parse_url: true });
         res.render('login', {
@@ -56,9 +58,9 @@ export class TestSiteHandler {
           sqrlQR: qrSvg
         });
       })
-      .post(loginRoute, passport.authenticate('sqrl', {
+      .post(sqrlLoginRoute, passport.authenticate('sqrl', {
         successRedirect: '/',
-        failureRedirect: loginRoute
+        failureRedirect: loginPageRoute
       }))
       .get('/', (req, res) => {
         res.render('index', {
