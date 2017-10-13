@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as http from 'http';
 import * as passport from 'passport';
 import * as path from 'path';
+import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
 import { AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
 import { ILogger } from './Logging';
@@ -22,7 +23,6 @@ import { ILogger } from './Logging';
 export class TestSiteHandler {
   private testSiteServer: http.Server;
   private sqrlPassportStrategy: SQRLStrategy;
-  private loginPageTemplateText: string;
 
   constructor(log: ILogger, port: number = 5858) {
     let webSiteDir = path.join(__dirname, 'WebSite');
@@ -48,11 +48,12 @@ export class TestSiteHandler {
       .use(bodyParser.urlencoded({extended: true}))  // Needed for parsing bodies (login)
       .get(loginRoute, (req, res) => {
         let sqrlUrl = this.sqrlPassportStrategy.getSqrlUrl(req);
+        let qrSvg = qr.imageSync(sqrlUrl, { type: 'svg', parse_url: true });
         res.render('login', {
           username: 'TODOusername',
           sqrlPublicKey: 'TODOsqrlpublic',
           sqrlUrl: sqrlUrl,
-          sqrlQR: sqrlUrl  // TODO: QR instead
+          sqrlQR: qrSvg
         });
       })
       .post(loginRoute, passport.authenticate('sqrl', {
