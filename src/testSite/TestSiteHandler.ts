@@ -52,6 +52,7 @@ export class TestSiteHandler {
         let sqrlUrl = this.sqrlPassportStrategy.getSqrlUrl(req);
         let qrSvg = qr.imageSync(sqrlUrl, { type: 'svg', parse_url: true });
         res.render('login', {
+          subpageName: 'Log In',
           username: 'TODOusername',
           sqrlPublicKey: 'TODOsqrlpublic',
           sqrlUrl: sqrlUrl,
@@ -64,6 +65,7 @@ export class TestSiteHandler {
       }))
       .get('/', (req, res) => {
         res.render('index', {
+          subpageName: 'Main',
           username: 'TODOusername',  // TODO get user, other info from client session cookie ref to back-end session store
           sqrlPublicKey: 'TODOsqrlpublic'
         });

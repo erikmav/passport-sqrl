@@ -17,6 +17,11 @@ body, input[text], button {
   color: #AAA;
   font-family: Cambria, Georgia;
 }
+.qr-code {
+  width: 400;
+  max-width: 30%;
+  max-height: 30%;
+}
 /* everywhere else */
 * {
   font-family: Arial, Helvetica, sans-serif;
