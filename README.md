@@ -29,7 +29,7 @@ Building the code places the results into the out/ folder.
 You can also run the build in the Windows console if you need to by running the command `gulp`.
 
 ## Unit tests
-A "pure" unit test suite for the passport-sqrl code is build into the build and its failure causes the build to fail.
+A "pure" unit test suite for the passport-sqrl code is under the src/SqrlTests directory and built into the build, and its failure causes the build to fail.
 
 ## Integration tests
 There is a suite of tests that start up a Node server with Express, passport, and passport-sqrl for integration testing. These are not "pure" unit tests but they also cause the build to fail if they are not working.
