@@ -10,7 +10,10 @@ import { SqrlBodyParser } from '../passport-sqrl/SqrlBodyParser';
 
 /**
  * Implements the logic for a minimal SQRL client, used for generating mock call data for unit tests
- * or real calls to a loopback NodeJS server hosting the passport-sqrl auth strategy.
+ * or real calls to a loopback or remote NodeJS server hosting the passport-sqrl auth strategy.
+ * This client object contains protocol state for the conversation with the web server.
+ * One client object is required for each server and, depending on its state, for each
+ * interaction with the server.
  */
 export class MockSQRLClient {
   public static canonicalizeSqrlUrl(sqrlUrl: string): string {
@@ -161,7 +164,8 @@ export class MockSQRLClient {
    *   'enable' - reverse of 'disable'
    *   'remove' - requests the server to remove the user's identity (which must have previously been
    *              disabled) from the server's identity store.
-   * @param options: A tilde (~) separated set of option flags for the server. E.g. 
+   * @param primaryIdentOnly: Forces the client to present only its primary identity even
+   * if there are deprecated secondary identities. Default is to use everything available. 
    */
   public generatePostBody(cmd: string, primaryIdentOnly: boolean = false): any {
     // Per SQRL client value protocol, the name-value pairs below will be joined in the same order
@@ -205,7 +209,7 @@ export class MockSQRLClient {
     let result = {
       client: client,
       server: server,
-      ids: base64url.encode(clientServerSignature)
+      ids: base64url.encode(clientServerSignature),
     };
 
     if (!primaryIdentOnly && this.previousIdentityPublicKeys.length > 0) {

@@ -96,11 +96,6 @@ export class SQRLStrategy extends Strategy {
       params = req.params;  // Allow GET calls with URL params.
     }
 
-    // Expected params from https://www.grc.com/sqrl/protocol.htm "POST Queries" section.
-    let client = params.client;  // base64url encoded client arguments consisting of name1=value1&name2=value2&... format
-    let server = params.server;  // base64url encoded original SQRL URL, or base64url encoded name1=value1&name2=value2&... format
-    let ids = params.ids;
-
     let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseBodyFields(params);
 
     this.authCallback(clientRequestInfo)
@@ -222,8 +217,8 @@ export class ClientRequestInfo {
   /**
    * Optional flag from the client ('cps' in its opt= option flag list, see
    * https://www.grc.com/sqrl/semantics.htm) in an 'ident' command, requesting
-   * that the server disable security question style alternate identity recovery methods.
-   * The server should ignore this field value in query commands.
+   * that the server return in a url= response the logged-in URL that a client-side
+   * plugin should redirect to after login is completed.
    */
   public clientProvidedSession: boolean;
 
