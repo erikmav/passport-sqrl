@@ -61,6 +61,7 @@ var Paths = {
 
   TestSiteOutput: 'out/testSite',
   TestSiteTestsOutput: 'out/testSiteClient',
+  IntegrationTestsOutput: 'out/IntegrationTests',
 
   InitialSetupOutput: 'out/InitialSetup',
   InitialSetupOutputShared: 'out/InitialSetup/shared',
@@ -80,7 +81,7 @@ gulp.task('default', [
   'copy-test-site-static-files',
   'run-passport-sqrl-unit-tests',
 
-  //'run-test-site-integration-tests',
+  'run-test-site-integration-tests',
 ]);
 gulp.task('build', ['default']);
 
@@ -108,14 +109,14 @@ gulp.task('transpile-typescript', [], () => {
 });
 
 // http://andrewconnell.com/blog/running-mocha-tests-with-visual-studio-code
-gulp.task('run-test-site-integration-tests', ['transpile-typescript', 'copy-test-site-static-files'], () => {
-  return gulp.src(Paths.TestSiteTestsOutput + '/SQRL.tests.js', { read: false })
+gulp.task('run-passport-sqrl-unit-tests', ['transpile-typescript'], () => {
+  return gulp.src(Paths.PassportSqrlTestsOutput + '/**/*.js', { read: false })
     .pipe(mocha({ reporter: 'spec' }));
 });
 
 // http://andrewconnell.com/blog/running-mocha-tests-with-visual-studio-code
-gulp.task('run-passport-sqrl-unit-tests', ['transpile-typescript'], () => {
-  return gulp.src(Paths.PassportSqrlTestsOutput + '/**/*.js', { read: false })
+gulp.task('run-test-site-integration-tests', ['transpile-typescript', 'copy-test-site-static-files'], () => {
+  return gulp.src(Paths.IntegrationTestsOutput + '/Sqrl.IntegrationTests.js', { read: false })
     .pipe(mocha({ reporter: 'spec' }));
 });
 

@@ -25,6 +25,7 @@ import * as passport from 'passport';
 import * as path from 'path';
 import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
+import * as util from 'util';
 import { AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
 import { ILogger } from './Logging';
 
@@ -32,8 +33,10 @@ export class TestSiteHandler {
   private testSiteServer: http.Server;
   private sqrlPassportStrategy: SQRLStrategy;
   private nedb: neDB;
+  private log: ILogger;
 
   constructor(log: ILogger, port: number = 5858) {
+    this.log = log;
     let webSiteDir = path.join(__dirname, 'WebSite');
     const sqrlLoginRoute = '/sqrlLogin';
     const loginPageRoute = '/login';
@@ -57,6 +60,7 @@ export class TestSiteHandler {
     // Useful: http://toon.io/understanding-passportjs-authentication-flow/
     const app = express()
       .set('view engine', 'ejs')
+      .set('views', path.join(__dirname, 'views'))
       .use(expressLayouts)
       .use(favicon(webSiteDir + '/favicon.ico'))  // First to handle quickly without passing through other middleware layers
       .use(cookieParser())
@@ -70,12 +74,11 @@ export class TestSiteHandler {
       .use(passport.initialize())
       .use(passport.session())
       .get(loginPageRoute, (req, res) => {
+        this.log.debug('/login requested');
         let sqrlUrl = this.sqrlPassportStrategy.getSqrlUrl(req);
         let qrSvg = qr.imageSync(sqrlUrl, { type: 'svg', parse_url: true });
         res.render('login', {
           subpageName: 'Log In',
-          username: req.user.name,
-          sqrlPublicKey: req.user.sqrlPublicKey,
           sqrlUrl: sqrlUrl,
           sqrlQR: qrSvg
         });
@@ -85,15 +88,21 @@ export class TestSiteHandler {
         failureRedirect: loginPageRoute
       }))
       .get('/', (req, res) => {
-        res.render('index', {
-          subpageName: 'Main',
-          username: req.user.name,  // TODO get user, other info from client session cookie ref to back-end session store
-          sqrlPublicKey: req.user.sqrlPublicKey
-        });
+        this.log.debug('/ requested');
+        if (!req.user) {
+          res.redirect(loginPageRoute);
+        } else {
+          res.render('index', {
+            subpageName: 'Main',
+            username: req.user.name,  // TODO get user, other info from client session cookie ref to back-end session store
+            sqrlPublicKey: req.user.sqrlPublicKey
+          });
+        }
       })
       .use(express.static(webSiteDir));  // Serve static scripts and assets. Must come after non-file (e.g. templates, REST) middleware
 
     this.testSiteServer = http.createServer(app);
+    log.info(`Test server listening on port ${port}`);
     this.testSiteServer.listen(port);
   }
 

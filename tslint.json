@@ -14,5 +14,7 @@
         "object-literal-shorthand": false,
         "trailing-comma": false
     },
-    "exclude": [ "node_modules" ]
+    "linterOptions": {
+        "exclude": [ "**/*.d.ts" ]
+    }
 }
