@@ -46,10 +46,12 @@ export class SqrlUrlFactory {
       secure: boolean,
       domain: string,
       serverNut: string | Buffer,
+      port?: number,
       pathString?: string,
       domainExtension?: number)
       : string {
     let scheme = secure ? 'sqrl' : 'qrl';
+    let portPart = port ? `:${port}` : '';
 
     if (!pathString) {
       pathString = '';
@@ -77,11 +79,12 @@ export class SqrlUrlFactory {
       nut = serverNut;
     }
 
-    return `${scheme}://${domain}${pathString}?nut=${nut}${domainExt}`;
+    return `${scheme}://${domain}${portPart}${pathString}?nut=${nut}${domainExt}`;
   }
 
   private secure: boolean;
   private domain: string;
+  private port: number | undefined;
   private pathString: string | undefined;
   private domainExtension?: number;
   
@@ -89,13 +92,15 @@ export class SqrlUrlFactory {
    * Creates a SQRL URL factory with static configuration information.
    * @param secure Whether the server is using TLS, which maps to the 'sqrl://' or 'qrl://' schemes.
    * @param domain The site domain, e.g. "www.foo.com"
+   * @param port Optional port.
    * @param pathString Optional path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
    * @param domainExtension When positive, specifies the value to place into the x= query parameter
    *   that tells the client how many characters of the pathString to include in its server key hash.
    */
-  constructor(secure: boolean, domain: string, pathString?: string, domainExtension?: number) {
+  constructor(secure: boolean, domain: string, port?: number, pathString?: string, domainExtension?: number) {
     this.secure = secure;
     this.domain = domain;
+    this.port = port;
     this.pathString = pathString;
     this.domainExtension = domainExtension;
   }
@@ -114,6 +119,7 @@ export class SqrlUrlFactory {
         this.secure,
         this.domain,
         serverNut,
+        this.port,
         pathString || this.pathString,
         domainExtension || this.domainExtension);
   }

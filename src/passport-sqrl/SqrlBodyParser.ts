@@ -46,6 +46,13 @@ export class SqrlBodyParser {
    *   
    */
   public static parseBodyFields(body: any): ClientRequestInfo {
+    if (!body) {
+      throw new Error("Body is required");
+    }
+
+    if (!body.client) {
+      throw new Error("Body client field is required");
+    }
     let clientProps = SqrlBodyParser.parseBase64CRLFSeparatedFields(body.client);
     
     //  server: string,

@@ -65,6 +65,7 @@ export class SQRLStrategy extends Strategy {
     this.urlFactory = new SqrlUrlFactory(
         config.secure,
         config.localDomainName,
+        config.port,
         config.urlPath,
         config.domainExtension);
 
@@ -251,6 +252,9 @@ export class SQRLStrategyConfig {
 
   /** Provides the domain name to use in generating SQRL URLs to send to clients. */
   public localDomainName: string;
+
+  /** The port. */
+  public port?: number;
 
   /**
    * The URL path to the site's login route that receives the SQRL

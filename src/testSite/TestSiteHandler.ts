@@ -46,16 +46,19 @@ export class TestSiteHandler {
     this.sqrlPassportStrategy = new SQRLStrategy(<SQRLStrategyConfig> {
         secure: false,
         localDomainName: 'localhost',
+        port: port,
         urlPath: sqrlLoginRoute,
       },
+      // TODO: this.findAndUpdateOrCreateUser);
       (clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> => {
-        
         return Promise.resolve(<AuthCompletionInfo> {
-          user: { name: 'bob' },
+          user: { name: 'bob', sqrlPrimaryIdentityPublicKey: 'abcd' },
           info: 'info!'
         });
       });
     passport.use(this.sqrlPassportStrategy);
+    passport.serializeUser((user: UserDBRecord, done) => done(null, user.sqrlPrimaryIdentityPublicKey));
+    passport.deserializeUser((id: any, done) => this.findUser(id, done));
 
     // Useful: http://toon.io/understanding-passportjs-authentication-flow/
     const app = express()
@@ -83,7 +86,7 @@ export class TestSiteHandler {
           sqrlQR: qrSvg
         });
       })
-      .post(sqrlLoginRoute, passport.authenticate('sqrl', {
+      .post(sqrlLoginRoute, passport.authenticate('sqrl', <passport.AuthenticateOptions> {
         successRedirect: '/',
         failureRedirect: loginPageRoute
       }))
@@ -95,7 +98,7 @@ export class TestSiteHandler {
           res.render('index', {
             subpageName: 'Main',
             username: req.user.name,  // TODO get user, other info from client session cookie ref to back-end session store
-            sqrlPublicKey: req.user.sqrlPublicKey
+            sqrlPublicKey: req.user.sqrlPrimaryIdentityPublicKey
           });
         }
       })
@@ -110,6 +113,16 @@ export class TestSiteHandler {
     this.testSiteServer.close();
   }
 
+  // TODO: promisify
+  private findUser(sqrlPublicKey: string, done): void {
+    // Treat the SQRL client's public key as a primary search key in the database.
+    let userDBRecord = <UserDBRecord> {
+      sqrlPrimaryIdentityPublicKey: sqrlPublicKey,
+    };
+    this.nedb.findOne(userDBRecord, (err: Error, doc: UserDBRecord) => done(err, doc));
+  }
+
+  // TODO: Promisify
   private findAndUpdateOrCreateUser(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // Treat the SQRL client's public key as a primary search key in the database.
     let userDBRecord = <UserDBRecord> {
@@ -173,6 +186,7 @@ class UserDBRecord {
   }
 
   // _id is implicit from NeDB.
+  /* tslint:disable */ public _id?: string; /* tslint:enable */
   
   /** User name. Could be filled in from any login form submitted from the client. */
   public name?: string;

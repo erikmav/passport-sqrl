@@ -141,15 +141,17 @@ export class MockSQRLClient {
     }
   }
 
-  public async performInitialQuery(): Promise<void> {
-    let postBody = this.generatePostBody('query');
-    let reqOptions = <request.CoreOptions> {
+  public async performInitialQuery(): Promise<ServerResponseInfo> {
+    let postBody: RequestPostBody = this.generatePostBody('query');
+    let reqOptions = <requestPromise.RequestPromiseOptions> {
       method: 'POST',
-      formData: postBody
+      form: postBody
     };
-  
+
+    console.log(`MockSQRLClient: Running query against ${this.serverContactUrl}`);
     let resBody: string = await requestPromise(this.serverContactUrl, reqOptions);
     let res: ServerResponseInfo = MockSQRLClient.parseServerBody(resBody);
+    return res;
   }
 
   /**
@@ -167,7 +169,7 @@ export class MockSQRLClient {
    * @param primaryIdentOnly: Forces the client to present only its primary identity even
    * if there are deprecated secondary identities. Default is to use everything available. 
    */
-  public generatePostBody(cmd: string, primaryIdentOnly: boolean = false): any {
+  public generatePostBody(cmd: string, primaryIdentOnly: boolean = false): RequestPostBody {
     // Per SQRL client value protocol, the name-value pairs below will be joined in the same order
     // with CR and LF characters, then base64url encoded.
     let clientLines: string[] = [
@@ -206,7 +208,7 @@ export class MockSQRLClient {
     let clientServer = new Buffer(client + server, 'utf8');
     let clientServerSignature = ed25519.Sign(clientServer, this.primaryIdentityPrivateKey);
 
-    let result = {
+    let result = <RequestPostBody> {
       client: client,
       server: server,
       ids: base64url.encode(clientServerSignature),
@@ -219,6 +221,15 @@ export class MockSQRLClient {
     // TODO: Add urs field
     return result;
   }
+}
+
+/** The POST request body fields sent by the client to the server. Field names are defined by the SQRL standard. */
+export class RequestPostBody {
+  public client: string;
+  public server: string;
+  public ids: string;
+  public pids?: string;
+  public urs?: string;
 }
 
 /** Definitions for the Transaction Information Flag values specified in the SQRL specification. */
