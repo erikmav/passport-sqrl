@@ -25,9 +25,21 @@ import * as passport from 'passport';
 import * as path from 'path';
 import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
-import * as util from 'util';
+import { promisify } from 'util';
 import { AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
 import { ILogger } from './Logging';
+
+declare module 'nedb' {
+  class Nedb {
+    public findOneAsync(query: any): Promise<any>;
+    public insertAsync(newDoc: any): Promise<any>;
+    public updateAsync(query: any, updateQuery: any, options?: Nedb.UpdateOptions): Promise<number>;
+  }
+}
+
+(<any> neDB).prototype.findOneAsync = promisify(neDB.prototype.findOne);
+(<any> neDB).prototype.insertAsync = promisify(neDB.prototype.insert);
+(<any> neDB).prototype.updateAsync = promisify(neDB.prototype.update);
 
 export class TestSiteHandler {
   private testSiteServer: http.Server;
@@ -42,23 +54,17 @@ export class TestSiteHandler {
     const loginPageRoute = '/login';
 
     this.nedb = new neDB(<neDB.DataStoreOptions> { inMemoryOnly: true });
-    
+
     this.sqrlPassportStrategy = new SQRLStrategy(<SQRLStrategyConfig> {
         secure: false,
         localDomainName: 'localhost',
         port: port,
         urlPath: sqrlLoginRoute,
       },
-      // TODO: this.findAndUpdateOrCreateUser);
-      (clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> => {
-        return Promise.resolve(<AuthCompletionInfo> {
-          user: { name: 'bob', sqrlPrimaryIdentityPublicKey: 'abcd' },
-          info: 'info!'
-        });
-      });
+      (clientRequestInfo: ClientRequestInfo) => this.findAndUpdateOrCreateUser(clientRequestInfo));
     passport.use(this.sqrlPassportStrategy);
     passport.serializeUser((user: UserDBRecord, done) => done(null, user.sqrlPrimaryIdentityPublicKey));
-    passport.deserializeUser((id: any, done) => this.findUser(id, done));
+    passport.deserializeUser((id: any, done: (err: Error, doc: any) => void) => this.findUser(id, done));
 
     // Useful: http://toon.io/understanding-passportjs-authentication-flow/
     const app = express()
@@ -113,46 +119,47 @@ export class TestSiteHandler {
     this.testSiteServer.close();
   }
 
-  // TODO: promisify
-  private findUser(sqrlPublicKey: string, done): void {
+  private findUser(sqrlPublicKey: string, done: (err: Error, doc: any) => void): void {
     // Treat the SQRL client's public key as a primary search key in the database.
     let userDBRecord = <UserDBRecord> {
       sqrlPrimaryIdentityPublicKey: sqrlPublicKey,
     };
-    this.nedb.findOne(userDBRecord, (err: Error, doc: UserDBRecord) => done(err, doc));
+    this.nedb.findOne(userDBRecord, done);
   }
 
-  // TODO: Promisify
-  private findAndUpdateOrCreateUser(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
-    // Treat the SQRL client's public key as a primary search key in the database.
-    let userDBRecord = <UserDBRecord> {
-      sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
-    };
-    this.nedb.findOne(userDBRecord, (err: Error, doc: UserDBRecord) => {
-      if (doc == null) {
+  private async findAndUpdateOrCreateUser(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+    try {
+      // Treat the SQRL client's public key as a primary search key in the database.
+      let searchRecord = <UserDBRecord> {
+        sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
+      };
+      let result = await this.nedb.findOneAsync(searchRecord);
+      if (result == null) {
         // Not found by primary key. Maybe this is an identity change situation.
         // If a previous key was provided, search again.
-        if (clientRequestInfo.primaryIdentityPublicKey) {
-          this.nedb.findOne(userDBRecord, (prevKeyErr: Error, prevKeyDoc: UserDBRecord) => {
-            if (prevKeyDoc == null) {
-              // Didn't already exist, create an initial version.
-              userDBRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
-              this.nedb.insert(userDBRecord, (insertErr: Error, insertDoc: UserDBRecord) => {
-                
-              });
+        if (clientRequestInfo.previousIdentityPublicKey) {
+          searchRecord.sqrlPrimaryIdentityPublicKey = clientRequestInfo.previousIdentityPublicKey;
+          let prevKeyDoc: UserDBRecord = await this.nedb.findOneAsync(searchRecord);
+          if (prevKeyDoc == null) {
+            // Didn't already exist, create an initial version.
+            let newRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
+            result = await this.nedb.insertAsync(newRecord);
+          } else {
+            // The user has specified a new primary key, rearrange the record and update.
+            if (!prevKeyDoc.sqrlPreviousIdentityPublicKeys) {
+              prevKeyDoc.sqrlPreviousIdentityPublicKeys = [];
             }
-          });
+            prevKeyDoc.sqrlPreviousIdentityPublicKeys.push(clientRequestInfo.previousIdentityPublicKey);
+            prevKeyDoc.sqrlPrimaryIdentityPublicKey = clientRequestInfo.primaryIdentityPublicKey;
+            await this.nedb.updateAsync(searchRecord, prevKeyDoc);
+            result = prevKeyDoc;
+          }
         }
-
-        // Didn't already exist, create an initial version.
-        userDBRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
-        this.nedb.insert(userDBRecord, (insertErr: Error, insertDoc: UserDBRecord) => {
-          
-        });
-      } else {
-
       }
-    });
+      return <AuthCompletionInfo> { user: result };
+    } catch (err) {
+      return <AuthCompletionInfo> { err: err };
+    }
   }
 }
 
