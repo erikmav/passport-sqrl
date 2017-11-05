@@ -72,14 +72,19 @@ export class SqrlUrlFactory {
       domainExt = `&x=${domainExtension}`;
     }
 
-    let nut: string;
-    if (serverNut instanceof Buffer) {
-      nut = toSqrlBase64(serverNut);
-    } else {
-      nut = serverNut;
-    }
+    let nut: string = SqrlUrlFactory.nutToString(serverNut);
 
     return `${scheme}://${domain}${portPart}${pathString}?nut=${nut}${domainExt}`;
+  }
+
+  public static nutToString(nut: string | Buffer): string {
+    let nutStr: string;
+    if (nut instanceof Buffer) {
+      nutStr = toSqrlBase64(nut);
+    } else {
+      nutStr = nut;
+    }
+    return nutStr;    
   }
 
   private secure: boolean;

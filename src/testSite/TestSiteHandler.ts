@@ -26,9 +26,16 @@ import * as path from 'path';
 import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
 import { promisify } from 'util';
-import { AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
+import { AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut } from '../passport-sqrl';
 import { ILogger } from './Logging';
 
+// TypeScript definitions for http do not include an overload that allows the common
+// Express app pattern as a param. Inject an overload to avoid compilation errors.
+declare module 'http' {
+  export function createServer(handler: express.Application): Server;
+}
+
+// Promisify extensions.
 declare module 'nedb' {
   class Nedb {
     public findOneAsync(query: any): Promise<any>;
@@ -36,7 +43,6 @@ declare module 'nedb' {
     public updateAsync(query: any, updateQuery: any, options?: Nedb.UpdateOptions): Promise<number>;
   }
 }
-
 (<any> neDB).prototype.findOneAsync = promisify(neDB.prototype.findOne);
 (<any> neDB).prototype.insertAsync = promisify(neDB.prototype.insert);
 (<any> neDB).prototype.updateAsync = promisify(neDB.prototype.update);
@@ -44,7 +50,8 @@ declare module 'nedb' {
 export class TestSiteHandler {
   private testSiteServer: http.Server;
   private sqrlPassportStrategy: SQRLStrategy;
-  private nedb: neDB;
+  private userTable: neDB;
+  private nutTable: neDB;
   private log: ILogger;
 
   constructor(log: ILogger, port: number = 5858) {
@@ -52,8 +59,11 @@ export class TestSiteHandler {
     let webSiteDir = path.join(__dirname, 'WebSite');
     const sqrlLoginRoute = '/sqrlLogin';
     const loginPageRoute = '/login';
+    const pollNutRoute = '/pollNut/:nut';
+    const loginSuccessRedirect = '/';
 
-    this.nedb = new neDB(<neDB.DataStoreOptions> { inMemoryOnly: true });
+    this.userTable = new neDB(<neDB.DataStoreOptions> { inMemoryOnly: true });
+    this.nutTable = new neDB(<neDB.DataStoreOptions> { inMemoryOnly: true });
 
     this.sqrlPassportStrategy = new SQRLStrategy(<SQRLStrategyConfig> {
         secure: false,
@@ -76,7 +86,7 @@ export class TestSiteHandler {
       .use(bodyParser.json())  // Needed for parsing bodies (login)
       .use(bodyParser.urlencoded({extended: true}))  // Needed for parsing bodies (login)
       .use(expressSession({  // Session load+decrypt support, must come before passport.session
-        secret: 'SQRL-Test',
+        secret: 'SQRL-Test',  // SECURITY: If reusing site code, you need to supply this secret from a real secret store.
         resave: true,
         saveUninitialized: true
       }))
@@ -84,18 +94,54 @@ export class TestSiteHandler {
       .use(passport.session())
       .get(loginPageRoute, (req, res) => {
         this.log.debug('/login requested');
-        let sqrlUrl = this.sqrlPassportStrategy.getSqrlUrl(req);
-        let qrSvg = qr.imageSync(sqrlUrl, { type: 'svg', parse_url: true });
+        let urlAndNut: SQRLUrlAndNut = this.sqrlPassportStrategy.getSqrlUrl(req);
+        let qrSvg = qr.imageSync(urlAndNut.url, { type: 'svg', parse_url: true });
         res.render('login', {
           subpageName: 'Log In',
-          sqrlUrl: sqrlUrl,
+          sqrlUrl: urlAndNut.url,
+          sqrlNut: urlAndNut.nutString,
           sqrlQR: qrSvg
         });
       })
-      .post(sqrlLoginRoute, passport.authenticate('sqrl', <passport.AuthenticateOptions> {
-        successRedirect: '/',
-        failureRedirect: loginPageRoute
-      }))
+
+      // NOTE: No SuccessRedirect, FailureRedirect - this is a web API more than a normal login endpoint.
+      // There can be multiple round-trips to this endpoint, typically for a query followed
+      // by a login request.
+      .post(sqrlLoginRoute, passport.authenticate('sqrl'))
+
+      .get(pollNutRoute, (req, res) => {
+        if (req.params.nut) {
+          this.pollNutAsync(req.params.nut)
+            .then(nutRecord => {
+              if (!nutRecord) {
+                res.statusCode = 404;
+              } else if (!nutRecord.loggedIn || !nutRecord.clientPrimaryIdentityPublicKey) {
+                res.set(<NutPollResult> { loggedIn: false });
+              } else {
+                this.findUser(nutRecord.clientPrimaryIdentityPublicKey, (err: Error, userDBRecord: UserDBRecord | null) => {
+                  // Ensure the cookie header for the response is set the way Passport normally does it.
+                  req.login(userDBRecord, loginErr => {
+                    if (loginErr) {
+                      res.statusCode = 400;
+                      res.statusMessage = loginErr.toString();
+                    } else {
+                      res.set(<NutPollResult> {
+                        loggedIn: nutRecord.loggedIn,
+                        redirectTo: loginSuccessRedirect
+                      });
+                    }
+                  });
+                });
+              }
+            })
+            .catch(reason => {
+              res.statusCode = 400;
+              res.statusMessage = reason;
+            });
+        } else {
+          res.statusCode = 404;
+        }
+      })
       .get('/', (req, res) => {
         this.log.debug('/ requested');
         if (!req.user) {
@@ -119,12 +165,41 @@ export class TestSiteHandler {
     this.testSiteServer.close();
   }
 
+  /**
+   * When we issue a SQRL URL, the nut (and the URL itself) act as a one-time nonce
+   * for that specific client. (Use of HTTPS for the site prevents disclosure to
+   * a man-in-the-middle.) We need to track the nut values for phone login.
+   * There are two important cases:
+   * 
+   * 1. Login is performed in a browser with a browser plugin. The plugin will
+   *    specify the cps option to the SQRL API, which means the plugin acts as
+   *    a go-between, sending the client's public key and signed SQRL URL, and
+   *    on 200 Success it uses the cps response as a success redirect. In this
+   *    case, the full query is handled by the plugin.
+   * 
+   * 2. Login is performed by a phone against the QR-Code of the URL. The phone
+   *    SQRL app contacts the SQRL API and presents the client's public key and
+   *    signed SQRL URL, but (usually) without the cps option, as the phone app
+   *    cannot redirect the browser. For this case, we need to track recent
+   *    nut values and have the page poll an ajax REST endpoint seeing if the nut
+   *    was logged in. In that case we log the browser on and return the usual
+   *    ambient user profile reference in the cookie.
+   */
+  private async nutIssuedToLoginPageAsync(sqrlUrlAndNut: SQRLUrlAndNut): Promise<void> {
+    return this.nutTable.insertAsync(new NutDBRecord(sqrlUrlAndNut.getNutString(), sqrlUrlAndNut.url));
+  }
+
+  /** Returns null if not found. */
+  private async pollNutAsync(nut: string): Promise<NutDBRecord | null> {
+    return this.nutTable.findOneAsync(new NutDBRecord(nut));
+  }
+
   private findUser(sqrlPublicKey: string, done: (err: Error, doc: any) => void): void {
     // Treat the SQRL client's public key as a primary search key in the database.
     let userDBRecord = <UserDBRecord> {
       sqrlPrimaryIdentityPublicKey: sqrlPublicKey,
     };
-    this.nedb.findOne(userDBRecord, done);
+    this.userTable.findOne(userDBRecord, done);
   }
 
   private async findAndUpdateOrCreateUser(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
@@ -133,17 +208,17 @@ export class TestSiteHandler {
       let searchRecord = <UserDBRecord> {
         sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
       };
-      let result = await this.nedb.findOneAsync(searchRecord);
+      let result = await this.userTable.findOneAsync(searchRecord);
       if (result == null) {
         // Not found by primary key. Maybe this is an identity change situation.
         // If a previous key was provided, search again.
         if (clientRequestInfo.previousIdentityPublicKey) {
           searchRecord.sqrlPrimaryIdentityPublicKey = clientRequestInfo.previousIdentityPublicKey;
-          let prevKeyDoc: UserDBRecord = await this.nedb.findOneAsync(searchRecord);
+          let prevKeyDoc: UserDBRecord = await this.userTable.findOneAsync(searchRecord);
           if (prevKeyDoc == null) {
             // Didn't already exist, create an initial version.
             let newRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
-            result = await this.nedb.insertAsync(newRecord);
+            result = await this.userTable.insertAsync(newRecord);
           } else {
             // The user has specified a new primary key, rearrange the record and update.
             if (!prevKeyDoc.sqrlPreviousIdentityPublicKeys) {
@@ -151,7 +226,7 @@ export class TestSiteHandler {
             }
             prevKeyDoc.sqrlPreviousIdentityPublicKeys.push(clientRequestInfo.previousIdentityPublicKey);
             prevKeyDoc.sqrlPrimaryIdentityPublicKey = clientRequestInfo.primaryIdentityPublicKey;
-            await this.nedb.updateAsync(searchRecord, prevKeyDoc);
+            await this.userTable.updateAsync(searchRecord, prevKeyDoc);
             result = prevKeyDoc;
           }
         }
@@ -221,4 +296,36 @@ class UserDBRecord {
    * in favor solely of SQRL related identity recovery.
    */
   public sqrlHardLockSqrlUse: boolean = false;
+}
+
+class NutDBRecord {
+  // _id is implicit from NeDB.
+  /* tslint:disable */ public _id?: string; /* tslint:enable */
+
+  /** The unique nut nonce generated and sent to a client. */
+  public nut: string;
+
+  /** The URL containing the nut. */
+  public url?: string;
+
+  /** When the nut was created, for sweeping old entries. */
+  public createdAt: Date;
+
+  /** Whether the nut was successfully logged in. Updated on login. */
+  public loggedIn: boolean;
+
+  /** The primary public key used for login, for looking up the user record. Updated on login. */
+  public clientPrimaryIdentityPublicKey?: string;
+
+  constructor(nut: string, url?: string) {
+    this.nut = nut;
+    this.url = url;
+    this.createdAt = new Date();
+  }
+}
+
+/** Returned from /pollNut call. login.ejs makes use of this. */
+class NutPollResult {
+  public loggedIn: boolean;
+  public redirectTo?: string;
 }

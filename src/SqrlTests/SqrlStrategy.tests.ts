@@ -2,7 +2,7 @@
 
 import { assert } from "chai";
 import * as express from 'express';
-import { AuthCallback, AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig } from '../passport-sqrl';
+import { AuthCallback, AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut } from '../passport-sqrl';
 import { MockSQRLClient } from './MockSqrlClient';
 
 describe('SQRLStrategy', () => {
@@ -21,10 +21,11 @@ describe('SQRLStrategy', () => {
           return Promise.resolve(<AuthCompletionInfo> {});
         });
 
-      let url = sqrl.getSqrlUrl(<express.Request> { });
-      assert.equal(url.substring(0, 27), 'qrl://domain.com/login?nut=');
+      let urlAndNut: SQRLUrlAndNut = sqrl.getSqrlUrl(<express.Request> { });
+      assert.equal(urlAndNut.url.substring(0, 27), 'qrl://domain.com/login?nut=');
       // 22 characters of base64 for 128 bits - should be random
-      assert.equal(url.substring(27 + 22), "&x=6");
+      assert.equal(urlAndNut.url.substring(27 + 22), "&x=6");
+      assert.isNotNull(urlAndNut.nut);
 
       assert.isFalse(authCalled);
     });
@@ -47,8 +48,9 @@ describe('SQRLStrategy', () => {
           return Promise.resolve(<AuthCompletionInfo> {});
         });
 
-      let url = sqrl.getSqrlUrl(<express.Request> { });
-      assert.equal(url, 'sqrl://domain.com/login?nut=nuts!');
+      let urlAndNut: SQRLUrlAndNut = sqrl.getSqrlUrl(<express.Request> { });
+      assert.equal(urlAndNut.url, 'sqrl://domain.com/login?nut=nuts!');
+      assert.equal(urlAndNut.nut, 'nuts!');
 
       assert.isFalse(authCalled);
     });

@@ -77,17 +77,22 @@ export class SQRLStrategy extends Strategy {
   }
 
   /**
-   * Composes and returns a SQRL URL containing a unique "nut".
-   * This URL should be passed though a QR-Code generator to
+   * Composes and returns a SQRL URL containing a unique "nut",
+   * plus the nut value for registration for the external
+   * phone login flow.
+   * 
+   * The URL should be passed though a QR-Code generator to
    * produce the SQRL login QR for the client.
    */
-  public getSqrlUrl(req: express.Request): string {
-    return this.urlFactory.create(this.nutGenerator(req));
+  public getSqrlUrl(req: express.Request): SQRLUrlAndNut {
+    let nut: string | Buffer = this.nutGenerator(req);
+    let nutString = SqrlUrlFactory.nutToString(nut);
+    return new SQRLUrlAndNut(this.urlFactory.create(nutString), nut, nutString);
   }
 
   /**
-   * Called by the PassportJS middleware when this strategy is configured on an
-   * HTTP POST route and a client call is received.
+   * General-purpose SQRL API called by the PassportJS middleware when this strategy
+   * is configured on an HTTP POST route and a client call is received.
    */
   public authenticate(req: express.Request, options?: any): void {
     let params: any;
@@ -121,6 +126,19 @@ export class SQRLStrategy extends Strategy {
   /** Default implementation of nut generation - creates a 128-bit random number. */
   private generateRandomNut(): string | Buffer {
     return crypto.randomBytes(16 /*128 bits*/);
+  }
+}
+
+/** A SQRL URL and its contained nut, broken out to separate fields for varying purposes. */
+export class SQRLUrlAndNut {
+  public url: string;
+  public nut: string | Buffer;
+  public nutString: string;
+
+  constructor(url: string, nut: string | Buffer, nutString: string) {
+    this.url = url;
+    this.nut = nut;
+    this.nutString = nutString;
   }
 }
 

@@ -1,6 +1,34 @@
+<script>
+  let loginTextElement = document.getElementById('login-text');
+  
+  // Poll the back-end to see if a phone login has occurred.
+  const nutCheckIntervalMsec = 500;
+  settimeout(pollNut, nutCheckIntervalMsec);
+
+  function pollNut() {
+    $.get("/pollNut/<%= sqrlNut %>", {
+      cache: false,
+      error: (jqXHR, textStatus, errorThrown) => $("#login-text").innerText = `ERROR getting nut status: ${textStatus}: ${errorThrown}`,
+      success: (data, textStatus, jqXHR) => {
+        // Store the login cookie value and Redirect the page if the nut was logged in.
+        // Data is a NutPollResult
+        if (data.loggedIn) {
+          $("#login-text").innerText = `Success! Storing cookie value (${result.cookie}) and redirecting in a few seconds`;
+          document.cookie = data.cookie;
+          settimeout(() => window.location.href = data.redirectTo, 4000);
+        } else {
+          // Normal case: No login.
+          $("#login-text").innerText += ".";
+          settimeout(pollNut, nutCheckIntervalMsec);
+        }
+      }
+    });
+  }
+</script>
 <p>
   Welcome! Please log in with SQRL by scanning or clicking the QR code below.
 </p>
 <p>
   <a class="qr-code" href="<%= sqrlUrl %>"><%- sqrlQR %></a>
 </p>
+<p id="login-text"></p>
