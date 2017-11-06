@@ -9,9 +9,7 @@ export class SqrlBodyParser {
     // The body is a base64url-encoded string that, when decoded, is a set of
     // name-value pairs separated by CRLF pairs (see https://www.grc.com/sqrl/protocol.htm).
     let preSplit: string = base64url.decode(base64Props);
-    console.log(`erik: Whole message: ${preSplit}`);
     let lines: string[] = preSplit.split('\r\n');
-    console.log(`erik: ${lines.length} lines`);
     
     let props: any = {};
     lines.forEach(line => {
@@ -19,7 +17,6 @@ export class SqrlBodyParser {
       if (line.length === 0) {
         return;
       }
-      console.log(`erik: line: ${line}`);
       // The name is considered everything up to the first = sign; the value everything after.
       let eqIndex = line.indexOf('=');
       if (eqIndex < 1) {

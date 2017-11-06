@@ -89,6 +89,210 @@ export class AuthCompletionInfo {
  */
 export type AuthCallback = (clientRequestInfo: ClientRequestInfo) => Promise<AuthCompletionInfo>;
 
+/**
+ * ExpressJS middleware for the SQRL API.
+ * This handler is intended to be attached to a SQRL-specific route, e.g. '/sqrl',
+ * that is not hooked into PassportJS.
+ * 
+ * Experimental - the original implementation for SQRL is in class SQRLStrategy
+ * as a PassportJS Strategy, but Strategies do not have access to the 'res'
+ * response object and cannot send a response body.
+ * 
+ */
+export class SQRLExpress {
+  private config: SQRLStrategyConfig;
+  private queryCallback: AuthCallback;
+  private identCallback: AuthCallback;
+  private disableCallback: AuthCallback;
+  private enableCallback: AuthCallback;
+  private removeCallback: AuthCallback;
+  private urlFactory: SqrlUrlFactory;
+  private nutGenerator: (req: express.Request) => string | Buffer;
+
+  /**
+   * Creates a new SQRL passport strategy instance.
+   * @param authCallback Called by the SQRL strategy to verify access for the provided client key and other information.
+   */
+  constructor(
+      config: SQRLStrategyConfig,
+      query: AuthCallback,
+      ident: AuthCallback,
+      disable: AuthCallback,
+      enable: AuthCallback,
+      remove: AuthCallback) {
+    this.config = config;
+    this.queryCallback = query;
+    this.identCallback = ident;
+    this.disableCallback = disable;
+    this.enableCallback = enable;
+    this.removeCallback = remove;
+
+    this.urlFactory = new SqrlUrlFactory(
+        config.secure,
+        config.localDomainName,
+        config.port,
+        config.urlPath,
+        config.domainExtension);
+
+    if (!config.nutGenerator) {
+      this.nutGenerator = this.generateRandomNut;
+    } else {
+      this.nutGenerator = config.nutGenerator;
+    }
+  }
+
+  /**
+   * Composes and returns a SQRL URL containing a unique "nut",
+   * plus the nut value for registration for the external
+   * phone login flow.
+   * 
+   * The URL should be passed though a QR-Code generator to
+   * produce the SQRL login QR for the client.
+   */
+  public getSqrlUrl(req: express.Request): SQRLUrlAndNut {
+    let nut: string | Buffer = this.nutGenerator(req);
+    let nutString = SqrlUrlFactory.nutToString(nut);
+    return new SQRLUrlAndNut(this.urlFactory.create(nutString), nut, nutString);
+  }
+
+  /**
+   * The Express middleware handler. Use like:
+   * 
+   * let sqrlApi = new SQRLExpress(...);
+   * app.post('/sqrl', sqrlApi.HandleSqrlApi);
+   */
+  public HandleSqrlApi = (req: express.Request, res: express.Response) => {
+    // Promisify to allow async coding style in authenticateAync and in unit tests.
+    this.authenticateAsync(req)
+      .then(authResult => {
+        res.write(authResult.body);
+        res.statusCode = authResult.httpResponseCode;
+        
+        // TODO - can we wire this into Passport somehow?
+        if (!authResult.callFail) {
+          // We have a user. Can we get PassportJS to accept it and perform its normal
+          // steps, including various auth success options, translation of session key value,
+          // and so on?
+        }
+
+        res.end();
+      })
+      .catch(err => {
+        // TODO: Can we differentiate transient versus nontransient errors?
+        /* tslint:disable:no-bitwise */
+        let tif: TIFFlags = TIFFlags.CommandFailed | TIFFlags.TransientError;
+        /* tslint:enable:no-bitwise */
+
+        // Per SQRL protocol, the name-value pairs below will be joined in the same order
+        // with CR and LF characters, then base64url encoded.
+        let serverLines: string[] = [
+          'ver=1',  // Suported versions list
+          'nut=' + SqrlUrlFactory.nutToString(this.nutGenerator(req)),  // TODO: Register this with upper handler
+          'tif=' + tif.toString(16),
+          'qry=' + this.config.urlPath,
+
+          // Use "ask" dialog on client to show error.
+          'ask=' + "Server error: " + err.toString(),
+        ];
+        let resp = serverLines.join("\r\n") + "\r\n";  // Last line must have CRLF as well.
+        resp = base64url.encode(resp);
+
+        res.statusCode = 500;
+        res.end(resp);
+      });
+  }
+
+  /**
+   * Promisified version of authenticate(), public for unit testing.
+   * Not part of the PassportJS API.
+   */
+  public async authenticateAsync(req: express.Request): Promise<AuthenticateAsyncResult> {
+    let params: any;
+    if (req.method === "POST") {
+      params = req.body;
+    } else {
+      params = req.params;  // Allow GET calls with URL params.
+    }
+
+    let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseBodyFields(params);
+    if (clientRequestInfo.protocolVersion !== 1) {
+      throw new Error(`This server only handles SQRL protocol revision 1`);
+    }
+
+    // Fill in the nut and next URL before the callback to let them be stored during the call.
+    clientRequestInfo.nextNut = SqrlUrlFactory.nutToString(this.nutGenerator(req));
+
+    let callback: AuthCallback;
+    switch (clientRequestInfo.sqrlCommand) {
+      case 'query':
+        callback = this.queryCallback;
+        break;
+      case 'ident':
+        callback = this.identCallback;
+        break;
+      case 'disable':
+        callback = this.disableCallback;
+        break;
+      case 'enable':
+        callback = this.enableCallback;
+        break;
+      case 'remove':
+        callback = this.removeCallback;
+        break;
+      default:
+        throw new Error(`Unknown SQRL command ${clientRequestInfo.sqrlCommand}`);
+    }
+
+    // The await here will throw any exceptions outward to the
+    // authenticate() callback handler.
+    let authCompletion: AuthCompletionInfo = await callback(clientRequestInfo);
+    console.log(`erik: cmd ${clientRequestInfo.sqrlCommand}, user? ${authCompletion.user}`);
+    return <AuthenticateAsyncResult> {
+      user: authCompletion.user,
+      body: this.authCompletionToResponseBody(clientRequestInfo, authCompletion),
+
+      // Per the SQRL API for calls like query we must return a 200 even though
+      // there is no login performed, as this is really an API endpoint with multiple
+      // round-trips.
+      httpResponseCode: 200,
+
+      // Only for the ident API call do we return a success call to Passport,
+      // along with the user.
+      callFail: (clientRequestInfo.sqrlCommand !== 'ident' || !authCompletion.user)
+    };
+  }
+
+  /** Default implementation of nut generation - creates a 128-bit random number. */
+  private generateRandomNut(): string | Buffer {
+    return crypto.randomBytes(16 /*128 bits*/);
+  }
+
+  private authCompletionToResponseBody(clientRequestInfo: ClientRequestInfo, authInfo: AuthCompletionInfo): string {
+    // Per SQRL protocol, the name-value pairs below will be joined in the same order
+    // with CR and LF characters, then base64url encoded.
+    let serverLines: string[] = [
+      'ver=1',  // Suported versions list
+      'nut=' + clientRequestInfo.nextNut,
+      'tif=' + (authInfo.tifValues || 0).toString(16),
+      'qry=' + this.config.urlPath,
+    ];
+
+    if (clientRequestInfo.clientProvidedSession && clientRequestInfo.sqrlCommand !== 'query') {
+      serverLines.push('url=' + this.config.clientLoginSuccessUrl);
+    }
+    if (clientRequestInfo.returnSessionUnlockKey && authInfo.sessionUnlockKey) {
+      serverLines.push('suk=' + authInfo.sessionUnlockKey);
+    }
+    if (this.config.clientCancelAuthUrl) {
+      serverLines.push('can=' + this.config.clientCancelAuthUrl);
+    }
+
+    let resp = serverLines.join("\r\n") + "\r\n";  // Last line must have CRLF as well.
+    resp = base64url.encode(resp);
+    return resp;
+  }
+}
+
 /** The main SQRL PassportJS middleware. */
 export class SQRLStrategy extends Strategy {
   /**
@@ -191,6 +395,7 @@ export class SQRLStrategy extends Strategy {
     // Fill in the nut and next URL before the callback to let them be stored during the call.
     clientRequestInfo.nextNut = SqrlUrlFactory.nutToString(this.nutGenerator(req));
 
+    console.log(`erik: choosing from ${clientRequestInfo.sqrlCommand}`);
     let callback: AuthCallback;
     switch (clientRequestInfo.sqrlCommand) {
       case 'query':
@@ -215,6 +420,7 @@ export class SQRLStrategy extends Strategy {
     // The await here will throw any exceptions outward to the
     // authenticate() callback handler.
     let authCompletion: AuthCompletionInfo = await callback(clientRequestInfo);
+    console.log(`erik: cmd ${clientRequestInfo.sqrlCommand}, user? ${authCompletion.user}`);
     return <AuthenticateAsyncResult> {
       user: authCompletion.user,
       body: this.authCompletionToResponseBody(clientRequestInfo, authCompletion),
@@ -241,7 +447,7 @@ export class SQRLStrategy extends Strategy {
     let serverLines: string[] = [
       'ver=1',  // Suported versions list
       'nut=' + clientRequestInfo.nextNut,
-      'tif=' + authInfo.tifValues ? authInfo.tifValues.toString(16) : "0",
+      'tif=' + (authInfo.tifValues || 0).toString(16),
       'qry=' + this.config.urlPath,
     ];
 
@@ -255,9 +461,7 @@ export class SQRLStrategy extends Strategy {
       serverLines.push('can=' + this.config.clientCancelAuthUrl);
     }
 
-    console.log(`erik: resp: ${serverLines.length} lines`);
     let resp = serverLines.join("\r\n") + "\r\n";  // Last line must have CRLF as well.
-    console.log(`erik: resp: Whole thing: ${resp}`);
     resp = base64url.encode(resp);
     return resp;
   }

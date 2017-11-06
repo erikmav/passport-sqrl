@@ -26,7 +26,7 @@ import * as path from 'path';
 import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
 import { promisify } from 'util';
-import { AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
+import { AuthCompletionInfo, ClientRequestInfo, SQRLExpress, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
 import { ILogger } from './Logging';
 
 // TypeScript definitions for http do not include an overload that allows the common
@@ -50,6 +50,7 @@ declare module 'nedb' {
 export class TestSiteHandler {
   private testSiteServer: http.Server;
   private sqrlPassportStrategy: SQRLStrategy;
+  private sqrlApiHandler: SQRLExpress;
   private userTable: neDB;
   private nutTable: neDB;
   private log: ILogger;
@@ -57,6 +58,7 @@ export class TestSiteHandler {
   constructor(log: ILogger, port: number = 5858) {
     this.log = log;
     let webSiteDir = path.join(__dirname, 'WebSite');
+    const sqrlApiRoute = '/sqrl';
     const sqrlLoginRoute = '/sqrlLogin';
     const loginPageRoute = '/login';
     const pollNutRoute = '/pollNut/:nut';
@@ -65,11 +67,23 @@ export class TestSiteHandler {
     this.userTable = new neDB(<neDB.DataStoreOptions> { inMemoryOnly: true });
     this.nutTable = new neDB(<neDB.DataStoreOptions> { inMemoryOnly: true });
 
+    this.sqrlApiHandler = new SQRLExpress(<SQRLStrategyConfig> {
+        secure: false,
+        localDomainName: 'localhost',
+        port: port,
+        urlPath: sqrlApiRoute,
+      },
+      (clientRequestInfo: ClientRequestInfo) => this.query(clientRequestInfo),
+      (clientRequestInfo: ClientRequestInfo) => this.ident(clientRequestInfo),
+      (clientRequestInfo: ClientRequestInfo) => this.disable(clientRequestInfo),
+      (clientRequestInfo: ClientRequestInfo) => this.enable(clientRequestInfo),
+      (clientRequestInfo: ClientRequestInfo) => this.remove(clientRequestInfo));
+
     this.sqrlPassportStrategy = new SQRLStrategy(<SQRLStrategyConfig> {
         secure: false,
         localDomainName: 'localhost',
         port: port,
-        urlPath: sqrlLoginRoute,
+        urlPath: sqrlApiRoute,
       },
       (clientRequestInfo: ClientRequestInfo) => this.query(clientRequestInfo),
       (clientRequestInfo: ClientRequestInfo) => this.ident(clientRequestInfo),
@@ -113,6 +127,10 @@ export class TestSiteHandler {
       // by a login request.
       .post(sqrlLoginRoute, passport.authenticate('sqrl'))
 
+      // TODO: Keep? Refactor?
+      .post(sqrlApiRoute, this.sqrlApiHandler.HandleSqrlApi)
+      
+      // Used by login.ejs
       .get(pollNutRoute, (req, res) => {
         if (req.params.nut) {
           this.pollNutAsync(req.params.nut)
@@ -201,7 +219,7 @@ export class TestSiteHandler {
   private async query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL query. We don't create any new user records, just return whether we know about the user.
     let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
-    if (authInfo.user != null && clientRequestInfo.returnSessionUnlockKey) {
+    if (authInfo.user && clientRequestInfo.returnSessionUnlockKey) {
       let user = <UserDBRecord> authInfo.user;
       authInfo.sessionUnlockKey = user.sqrlServerUnlockPublicKey;
     }
@@ -209,11 +227,33 @@ export class TestSiteHandler {
   }
 
   private async ident(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+    console.log('erik: ident entry');
     // SQRL login request.
     let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
+    if (authInfo.user) {
+      /* tslint:disable:no-bitwise */
+      if (authInfo.tifValues & TIFFlags.PreviousIDMatch) {  /* tslint:enable:no-bitwise */
+        // The user has specified a new primary key, rearrange the record and update.
+        let user = authInfo.user;
+        if (!user.sqrlPreviousIdentityPublicKeys) {
+          user.sqrlPreviousIdentityPublicKeys = [];
+        }
+        user.sqrlPreviousIdentityPublicKeys.push(clientRequestInfo.previousIdentityPublicKey);  // TODO: Dedup
+        user.sqrlPrimaryIdentityPublicKey = clientRequestInfo.primaryIdentityPublicKey;
+        let searchRecord = <UserDBRecord> {
+          sqrlPrimaryIdentityPublicKey: clientRequestInfo.previousIdentityPublicKey
+        };
+        await this.userTable.updateAsync(searchRecord, user);
+      }
+      return authInfo;
+    }
 
-    // TODO
-
+    // Didn't already exist, create an initial version if this is a login API request.
+    let newRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
+    let result: UserDBRecord = await this.userTable.insertAsync(newRecord);
+    console.log(`erik: after insert user? ${result}`);
+    authInfo.user = result;
+    authInfo.tifValues = 0;
     return authInfo;
   }
 

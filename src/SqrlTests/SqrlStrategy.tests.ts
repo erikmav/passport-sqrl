@@ -74,7 +74,14 @@ describe('SQRLStrategy', () => {
         /*query:*/(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> => {
           queryRequestInfo = clientRequestInfo;
           return Promise.resolve(<AuthCompletionInfo> {
-            tifValues: TIFFlags.CurrentIDMatch
+            tifValues: 0
+          });
+        },
+        /*ident:*/(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> => {
+          queryRequestInfo = clientRequestInfo;
+          return Promise.resolve(<AuthCompletionInfo> {
+            tifValues: TIFFlags.CurrentIDMatch,
+            user: { name: "bob" }
           });
         });
 
@@ -93,18 +100,17 @@ describe('SQRLStrategy', () => {
       assert.equal(sqrl.enableCalls, 0);
       assert.equal(sqrl.removeCalls, 0);
       let res: ServerResponseInfo = client.parseServerBody(authResult.body);
-      assert.equal(res.tifValues, TIFFlags.CurrentIDMatch, 'Expected pass-through of identity match returned in mock');
+      assert.equal(res.tifValues, 0, 'Expected no match returned in mock');
 
       // Follow-up ident call.
       authResult = await sqrl.authenticateAsync(<express.Request> {
         method: "POST",
         body: client.generatePostBody('ident')
       });
-      assert.equal(sqrl.errorCalls, 0, 'Base error() should not have been called');
-      assert.equal(sqrl.failCalls, 1, 'Leftover query value');
-      assert.equal(sqrl.successCalls, 1, 'Base success() should have been called ident success');
-      assert.equal('bob', sqrl.successUser.name);
-      assert.equal('info!', sqrl.successInfo);
+      assert.isFalse(authResult.callFail, 'Result should not want to call Passport fail() since we matched user');
+      assert.equal(authResult.httpResponseCode, 200, 'Success expected');
+      assert(authResult.user, 'User record should be present');
+      assert.equal('bob', authResult.user.name);
       assert.equal(sqrl.queryCalls, 1);
       assert.equal(sqrl.identCalls, 1);
       assert.equal(sqrl.disableCalls, 0);
