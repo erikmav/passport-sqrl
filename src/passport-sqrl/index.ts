@@ -1,5 +1,6 @@
 // Main Strategy module for passport-sqrl
 
+import base64url from 'base64url';
 import * as crypto from 'crypto';
 import * as express from 'express';
 import { AuthenticateOptions } from 'passport';
@@ -88,7 +89,7 @@ export class AuthCompletionInfo {
  */
 export type AuthCallback = (clientRequestInfo: ClientRequestInfo) => Promise<AuthCompletionInfo>;
 
-/** The main SQRL passport middleware. */
+/** The main SQRL PassportJS middleware. */
 export class SQRLStrategy extends Strategy {
   /**
    * The strategy name ('sqrl') to use when configuring a passport mapping
@@ -240,7 +241,7 @@ export class SQRLStrategy extends Strategy {
     let serverLines: string[] = [
       'ver=1',  // Suported versions list
       'nut=' + clientRequestInfo.nextNut,
-      'tif=' + authInfo.tifValues.toString(16),
+      'tif=' + authInfo.tifValues ? authInfo.tifValues.toString(16) : "0",
       'qry=' + this.config.urlPath,
     ];
 
@@ -257,6 +258,7 @@ export class SQRLStrategy extends Strategy {
     console.log(`erik: resp: ${serverLines.length} lines`);
     let resp = serverLines.join("\r\n") + "\r\n";  // Last line must have CRLF as well.
     console.log(`erik: resp: Whole thing: ${resp}`);
+    resp = base64url.encode(resp);
     return resp;
   }
 }

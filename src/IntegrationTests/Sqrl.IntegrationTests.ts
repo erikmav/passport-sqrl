@@ -76,7 +76,7 @@ describe('SqrlTestSite_Integration', () => {
       assert.equal(0, queryResponse.tifValues, "Expected no ID match to current server");
       console.log(`Next nut=${queryResponse.nextNut}`);
       console.log(`Next url=${queryResponse.nextRequestPathAndQuery}`);
-      assert(queryResponse.nextRequestPathAndQuery.startsWith('/sqrlLogin?nut='));
+      assert.equal(queryResponse.nextRequestPathAndQuery, '/sqrlLogin');
 
       site.close();
     });

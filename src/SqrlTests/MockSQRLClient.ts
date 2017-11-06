@@ -345,5 +345,4 @@ describe('SQRLClient', () => {
       assert.isTrue(clientRequestInfo.returnSessionUnlockKey);
     });
   });
-
 });

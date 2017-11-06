@@ -93,7 +93,7 @@ describe('SQRLStrategy', () => {
       assert.equal(sqrl.enableCalls, 0);
       assert.equal(sqrl.removeCalls, 0);
       let res: ServerResponseInfo = client.parseServerBody(authResult.body);
-      assert.equal(res.tifValues, 0/*No identity known*/);
+      assert.equal(res.tifValues, TIFFlags.CurrentIDMatch, 'Expected pass-through of identity match returned in mock');
 
       // Follow-up ident call.
       authResult = await sqrl.authenticateAsync(<express.Request> {

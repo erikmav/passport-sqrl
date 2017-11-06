@@ -300,7 +300,9 @@ export class TestSiteHandler {
         }
       }
     }
-    return <AuthCompletionInfo> { user: result };
+    let authInfo = new AuthCompletionInfo();
+    authInfo.user = result;
+    return authInfo;
   }
 }
 
