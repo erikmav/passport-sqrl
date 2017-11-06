@@ -8,7 +8,8 @@ import * as http from "http";
 import * as request from 'request';
 import * as requestPromise from 'request-promise-native';
 import * as rimraf from 'rimraf';
-import { MockSQRLClient, ServerResponseInfo, TIFFlags } from '../SqrlTests/MockSQRLClient';
+import { TIFFlags } from '../passport-sqrl';
+import { MockSQRLClient, ServerResponseInfo } from '../SqrlTests/MockSQRLClient';
 import { ILogger, LogLevel } from '../testSite/Logging';
 import * as testSite from '../testSite/TestSiteHandler';
 

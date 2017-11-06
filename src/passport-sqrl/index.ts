@@ -6,27 +6,78 @@ import { Strategy } from 'passport-strategy';
 import { SqrlBodyParser } from './SqrlBodyParser';
 import { SqrlUrlFactory } from './SqrlUrlFactory';
 
-/** Returned from a completed AuthCallback promise. */
-export class AuthCompletionInfo {
-  /**
-   * When present, indicates an internal error when processing the auth callback.
-   * Results in a 500 Server Error HTTP response.
-   */
-  public err?: Error;
+// TODO: Unit test for getting error on incorrect version number
+// TODO: Store URLs returned to clients  - or hashes of same - with policies like 12-hour timeouts. Check for valid URLs/hashes on client requests beyond 'query'.
+// TODO: Store nuts returned to clients.
+// TODO: Add nutCheckCallback: Promise<boolean> with backing in cache-like storage
+// TODO: Add urlCheckCallback: Promise<boolean> with backing in cache-like storage
+// TODO: Do we allow multiple query calls on URLs? Multiple calls to any URL?
+// TODO: Unit test for incorrect client URL - attack by client making things up
+// TODO: Unit tests for mising client fields - bad client or attack
+// TODO: Support default implementation of encrypted nut and support TIFFlags.IPAddressesMatch
 
+/** Definitions for the Transaction Information Flag values specified in the SQRL specification. */
+export enum TIFFlags {
+  /** The web server found an identity association for the user based on the primary/current identity key. */
+  CurrentIDMatch = 0x01,
+
+  /** The web server found an identity association for the user based on the deprecated/previous identity key. */
+  PreviousIDMatch = 0x02,
+
+  /** The IP address seen at the server for this response is the same as the requester IP for the login page. */
+  IPAddressesMatch = 0x04,
+
+  /** The user's SQRL profile on the server has previously been marked disabled by the user. */
+  IDDisabled = 0x08,
+
+  /** The client's request contained an unknown or unsupported verb. 0x40 CommandFailed will also be set in this case. */
+  FunctionNotSupported = 0x10,
+
+  /**
+   * The server encountered an internal error and requests that the client reissue its request using the new nut
+   * and query information in this response.
+   */
+  TransientError = 0x20,
+
+  /** The command failed. If 0x80 ClientFailure is not set, this indicates a non-retryable problem at the server. */
+  CommandFailed = 0x40,
+
+  /** The command failure was because the client's request was malformed. */
+  ClientFailure = 0x80,
+
+  /**
+   * The SQRL ID specified in the client's request did not match the SQRL ID in ambient session
+   * identity referred to by the client's cookie. The user needs to use the correct SQRL ID or
+   * log out of the web site and log back in with a new identity.
+   */
+  BadIDAssociation = 0x100,
+}
+
+/**
+ * Returned from a completed AuthCallback promise.
+ * Exceptions thrown from the AuthCallback are turned into HTTP 500 errors.
+ */
+export class AuthCompletionInfo {
   /**
    * When present, indicates authentication success and provides the user record retrieved
    * or created during the authentication request.
+   * 
+   * This field is not expected to be non-null for a SQRL 'query' command.
    */
   public user?: any;
 
+  /** SQRL Transaction Information Flags to return to the client. */
+  public tifValues: TIFFlags;
+
   /**
-   * When user is present, this is optional additional user information, e.g. a profile.
-   * When user and err are undefined this should be set to provide information to
-   * return to the client in a 401 challenge response; it can be either a string or an object
-   * having 'message' and 'type' fields.
+   * The client's Session Unlock Key if requested by the client
+   * sending a 'suk' option header (ClientRequestInfo.returnSessionUnlockKey)
    */
-  public info?: any;
+  public sessionUnlockKey?: string;
+
+  constructor() {
+    this.tifValues = 0;
+  }
 }
 
 /**
@@ -45,7 +96,11 @@ export class SQRLStrategy extends Strategy {
   public name: string = 'sqrl';
   
   private config: SQRLStrategyConfig;
-  private authCallback: AuthCallback;
+  private queryCallback: AuthCallback;
+  private identCallback: AuthCallback;
+  private disableCallback: AuthCallback;
+  private enableCallback: AuthCallback;
+  private removeCallback: AuthCallback;
   private urlFactory: SqrlUrlFactory;
   private nutGenerator: (req: express.Request) => string | Buffer;
 
@@ -53,15 +108,22 @@ export class SQRLStrategy extends Strategy {
    * Creates a new SQRL passport strategy instance.
    * @param authCallback Called by the SQRL strategy to verify access for the provided client key and other information.
    */
-  constructor(config: SQRLStrategyConfig, authCallback: AuthCallback) {
+  constructor(
+      config: SQRLStrategyConfig,
+      query: AuthCallback,
+      ident: AuthCallback,
+      disable: AuthCallback,
+      enable: AuthCallback,
+      remove: AuthCallback) {
     super();
 
-    if (!config) {
-      throw new Error("Parameter 'config' must be provided");
-    }
-
     this.config = config;
-    this.authCallback = authCallback;
+    this.queryCallback = query;
+    this.identCallback = ident;
+    this.disableCallback = disable;
+    this.enableCallback = enable;
+    this.removeCallback = remove;
+
     this.urlFactory = new SqrlUrlFactory(
         config.secure,
         config.localDomainName,
@@ -91,10 +153,27 @@ export class SQRLStrategy extends Strategy {
   }
 
   /**
-   * General-purpose SQRL API called by the PassportJS middleware when this strategy
-   * is configured on an HTTP POST route and a client call is received.
+   * PassportJS callback called when this strategy is configured on an HTTP(S)
+   * POST route and a client call is received.
    */
   public authenticate(req: express.Request, options?: any): void {
+    // Promisify to allow async coding style here and in unit tests.
+    this.authenticateAsync(req, options)
+      .then(authResult => {
+        if (authResult.callFail) {
+          this.fail(authResult.body, authResult.httpResponseCode);
+        } else {
+          this.success(authResult.user, authResult.body);
+        }
+      })
+      .catch(err => this.error(err));
+  }
+
+  /**
+   * Promisified version of authenticate(), public for unit testing.
+   * Not part of the PassportJS API.
+   */
+  public async authenticateAsync(req: express.Request, options?: any): Promise<AuthenticateAsyncResult> {
     let params: any;
     if (req.method === "POST") {
       params = req.body;
@@ -103,30 +182,110 @@ export class SQRLStrategy extends Strategy {
     }
 
     let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseBodyFields(params);
+    if (clientRequestInfo.protocolVersion !== 1) {
+      throw new Error(`This server only handles SQRL protocol revision 1`);
+    }
 
-    this.authCallback(clientRequestInfo)
-        .then((authCompletion: AuthCompletionInfo) => {
-          if (authCompletion.err) {
-            this.error(authCompletion.err);
-          } else if (!authCompletion.user) {
-            this.fail(authCompletion.info);
-          } else {
-            this.success(authCompletion.user, authCompletion.info);
-          }
-        })
-        .catch((reason: any) => this.error(reason));
+    // Fill in the nut and next URL before the callback to let them be stored during the call.
+    clientRequestInfo.nextNut = SqrlUrlFactory.nutToString(this.nutGenerator(req));
 
-    // Note on return here the asynchronous callback+promise above may not have returned.
-    // We can't perform an await here as this is not an async function.
-    // (Important for unit testing - have to poll for the end result or timeout.)
-    // In PassportJS and Connect+Express, the eventual call to this.success()/fail()/error()
-    // causes a response on the web site.
+    let callback: AuthCallback;
+    switch (clientRequestInfo.sqrlCommand) {
+      case 'query':
+        callback = this.queryCallback;
+        break;
+      case 'ident':
+        callback = this.identCallback;
+        break;
+      case 'disable':
+        callback = this.disableCallback;
+        break;
+      case 'enable':
+        callback = this.enableCallback;
+        break;
+      case 'remove':
+        callback = this.removeCallback;
+        break;
+      default:
+        throw new Error(`Unknown SQRL command ${clientRequestInfo.sqrlCommand}`);
+    }
+
+    // The await here will throw any exceptions outward to the
+    // authenticate() callback handler.
+    let authCompletion: AuthCompletionInfo = await callback(clientRequestInfo);
+    return <AuthenticateAsyncResult> {
+      user: authCompletion.user,
+      body: this.authCompletionToResponseBody(clientRequestInfo, authCompletion),
+
+      // Per the SQRL API for calls like query we must return a 200 even though
+      // there is no login performed, as this is really an API endpoint with multiple
+      // round-trips.
+      httpResponseCode: 200,
+
+      // Only for the ident API call do we return a success call to Passport,
+      // along with the user.
+      callFail: (clientRequestInfo.sqrlCommand !== 'ident' || !authCompletion.user)
+    };
   }
 
   /** Default implementation of nut generation - creates a 128-bit random number. */
   private generateRandomNut(): string | Buffer {
     return crypto.randomBytes(16 /*128 bits*/);
   }
+
+  private authCompletionToResponseBody(clientRequestInfo: ClientRequestInfo, authInfo: AuthCompletionInfo): string {
+    // Per SQRL protocol, the name-value pairs below will be joined in the same order
+    // with CR and LF characters, then base64url encoded.
+    let serverLines: string[] = [
+      'ver=1',  // Suported versions list
+      'nut=' + clientRequestInfo.nextNut,
+      'tif=' + authInfo.tifValues.toString(16),
+      'qry=' + this.config.urlPath,
+    ];
+
+    if (clientRequestInfo.clientProvidedSession && clientRequestInfo.sqrlCommand !== 'query') {
+      serverLines.push('url=' + this.config.clientLoginSuccessUrl);
+    }
+    if (clientRequestInfo.returnSessionUnlockKey && authInfo.sessionUnlockKey) {
+      serverLines.push('suk=' + authInfo.sessionUnlockKey);
+    }
+    if (this.config.clientCancelAuthUrl) {
+      serverLines.push('can=' + this.config.clientCancelAuthUrl);
+    }
+
+    console.log(`erik: resp: ${serverLines.length} lines`);
+    let resp = serverLines.join("\r\n") + "\r\n";  // Last line must have CRLF as well.
+    console.log(`erik: resp: Whole thing: ${resp}`);
+    return resp;
+  }
+}
+
+/**
+ * Encapsulates the parameters that are needed to resolve a
+ * Passport Strategy's authenticate() call.
+ * Public for unit testing.
+ */
+export class AuthenticateAsyncResult {
+  /**
+   * When user is present, this is optional additional user information, e.g. a profile.
+   * When user and err are undefined this should be set to provide information to
+   * return to the client in a 401 challenge response; it can be either a string or an object
+   * having 'message' and 'type' fields.
+   *
+   * This field is not expected to be non-null for a SQRL 'query' command.
+   */
+  public user?: any;
+
+  /** Response body additional information. */
+  public body?: any;
+
+  public httpResponseCode: number;
+
+  /**
+   * When false, the Passport base success(user, body) is called.
+   * When true, Passport base fail(body) is called instead.
+   */
+  public callFail: boolean;
 }
 
 /** A SQRL URL and its contained nut, broken out to separate fields for varying purposes. */
@@ -144,6 +303,10 @@ export class SQRLUrlAndNut {
 
 /**
  * Parameters derived from the POST or GET parameters to the SQRL auth route.
+ * This information gets passed to the query, ident, disable, enable, and remove
+ * callbacks to the auth implementation. The public keys provided here have
+ * already been validated against the private key and the nut and URL signatures.
+ *
  * See https://www.grc.com/sqrl/protocol.htm particularly "How to form the POST verb's body."
  */
 export class ClientRequestInfo {
@@ -257,6 +420,13 @@ export class ClientRequestInfo {
    */
   public serverAskResponseSelection?: number;
 
+  /**
+   * A new nut that will be returned in the nut= server response.
+   * The auth handler should store this nut in its "Recently Issued Nuts"
+   * cache to allow responding to NutCheckCallback calls.
+   */
+  public nextNut: string;
+
   /** Provides a Buffer version of primaryIdentityPublicKey. */
   public primaryIdentityPublicKeyBuf(): Buffer {
     return Buffer.from(this.primaryIdentityPublicKey, 'base64');
@@ -271,7 +441,7 @@ export class SQRLStrategyConfig {
   /** Provides the domain name to use in generating SQRL URLs to send to clients. */
   public localDomainName: string;
 
-  /** The port. */
+  /** The port. If not specified the URL will not include one and the browser will use the appropriate default. */
   public port?: number;
 
   /**
@@ -307,4 +477,22 @@ export class SQRLStrategyConfig {
    * as part of composing the URL.
    */
   public nutGenerator?: (req: express.Request) => string | Buffer;
+
+  /**
+   * The URL, typically a relative URL on the site, where the client
+   * should redirect on a successful login. This is used in response
+   * to SQRL commands other than 'query' that specify the cps
+   * (client-provided session) option asking for a success redirect.
+   * It is sent to the client in the url= response parameter
+   * (see https://www.grc.com/sqrl/semantics.htm).
+   */
+  public clientLoginSuccessUrl: string;
+
+  /**
+   * Optional 302 redirect that a same-device (browser plugin) SQRL
+   * client can use to redirect the client if the user cancels
+   * the authentication flow. This value is encoded in the can=
+   * body field (see https://www.grc.com/sqrl/semantics.htm).
+   */
+  public clientCancelAuthUrl?: string;
 }

@@ -5,7 +5,7 @@ import * as ed25519 from 'ed25519';
 import * as request from 'request';
 import * as requestPromise from 'request-promise-native';
 import * as url from 'url';
-import { ClientRequestInfo } from '../passport-sqrl';
+import { ClientRequestInfo, TIFFlags } from '../passport-sqrl';
 import { SqrlBodyParser } from '../passport-sqrl/SqrlBodyParser';
 
 /**
@@ -27,81 +27,12 @@ export class MockSQRLClient {
   }
 
   public static generateServerContactUrl(sqrlUrl: string): string {
-    // Disassemble the SQRL URL and reassemble with callable scheme/protocol.
-    // See https://www.grc.com/sqrl/protocol.htm "What we use, what we ignore."
+    // Disassemble the SQRL URL and reassemble with callable HTTP scheme/protocol.
     let urlObj: url.Url = url.parse(sqrlUrl, /*parseQueryString:*/false);
     let scheme = (urlObj.protocol || '').toLowerCase() === 'qrl:' ? 'http' : 'https';
     let path = urlObj.path ? urlObj.path : '';  // With parseQueryString==false this is the full path and query string after the hostname
     let port = urlObj.port ? ':' + urlObj.port : '';
     return `${scheme}://${urlObj.hostname}${port}${path}`;
-  }
-
-  public static parseServerBody(body: string): ServerResponseInfo {
-    let props = SqrlBodyParser.parseBase64CRLFSeparatedFields(body);
-
-    let vers: string[] = props.ver.split(',');
-    let supportedVersions: number[] = [];
-    vers.forEach(ver => {
-      let rangeLoHi: string[] = ver.split('-');
-      if (rangeLoHi.length === 1) {
-        supportedVersions.push(Number(rangeLoHi[0]));
-      } else if (rangeLoHi.length === 2) {
-        let lo = Number(rangeLoHi[0]);
-        let hi = Number(rangeLoHi[1]);
-        for (let i = lo; i <= hi; i++) {
-          supportedVersions.push(i);
-        }
-      } else {
-        throw new Error(`Version value ${ver} appears to be malformed, with either no values or more than one dash`);
-      }
-    });
-
-    if (!props.nut) {
-      throw new Error('Server values did not contain the required nut= property');
-    }
-    if (!props.tif) {
-      throw new Error('Server values did not contain the required tif= property');
-    }
-    if (!props.qry) {
-      throw new Error('Server values did not contain the required qry= property');
-    }
-
-    let askMessage: string | undefined;
-    let askButton1Label: string | undefined;
-    let askButton1Url: string | undefined;
-    let askButton2Label: string | undefined;
-    let askButton2Url: string | undefined;
-    if (props.ask) {
-      let parts: string[] = props.ask.split('~');
-      askMessage = parts[0];
-      let button1Parts = parts[1].split(';');
-      askButton1Label = button1Parts[0];
-      if (button1Parts.length > 1) {
-        askButton1Url = button1Parts[1];
-      }
-      if (parts.length > 2) {
-        let button2Parts = parts[2].split(';');
-        askButton2Label = button2Parts[0];
-        if (button2Parts.length > 1) {
-          askButton2Url = button2Parts[1];
-        }
-      }
-    }
-
-    return <ServerResponseInfo> {
-      supportedProtocolVersions: supportedVersions,
-      nextNut: props.nut,
-      tifValues: parseInt(props.tif, 16),
-      nextRequestPathAndQuery: props.qry,
-      successfulAuthenticationRedirectUrl: props.url,
-      secretIndex: props.sin,
-      serverUnlockKey: props.suk,
-      askMessage: askMessage,
-      askButton1Label: askButton1Label,
-      askButton1Url: askButton1Url,
-      askButton2Label: askButton2Label,
-      askButton2Url: askButton2Url      
-    };
   }
 
   // Options flags that get sent to the server on each request.
@@ -141,6 +72,7 @@ export class MockSQRLClient {
     }
   }
 
+  /** Performs an HTTP(S) call to a server. */
   public async performInitialQuery(): Promise<ServerResponseInfo> {
     let postBody: RequestPostBody = this.generatePostBody('query');
     let reqOptions = <requestPromise.RequestPromiseOptions> {
@@ -150,7 +82,7 @@ export class MockSQRLClient {
 
     console.log(`MockSQRLClient: Running query against ${this.serverContactUrl}`);
     let resBody: string = await requestPromise(this.serverContactUrl, reqOptions);
-    let res: ServerResponseInfo = MockSQRLClient.parseServerBody(resBody);
+    let res: ServerResponseInfo = this.parseServerBody(resBody);
     return res;
   }
 
@@ -221,6 +153,78 @@ export class MockSQRLClient {
     // TODO: Add urs field
     return result;
   }
+
+  /**
+   * Parses a response budy and updates local client state to
+   * prepare the client for the next call.
+   */
+  public parseServerBody(body: string): ServerResponseInfo {
+    let props = SqrlBodyParser.parseBase64CRLFSeparatedFields(body);
+
+    let vers: string[] = props.ver.split(',');
+    let supportedVersions: number[] = [];
+    vers.forEach(ver => {
+      let rangeLoHi: string[] = ver.split('-');
+      if (rangeLoHi.length === 1) {
+        supportedVersions.push(Number(rangeLoHi[0]));
+      } else if (rangeLoHi.length === 2) {
+        let lo = Number(rangeLoHi[0]);
+        let hi = Number(rangeLoHi[1]);
+        for (let i = lo; i <= hi; i++) {
+          supportedVersions.push(i);
+        }
+      } else {
+        throw new Error(`Version value ${ver} appears to be malformed, with either no values or more than one dash`);
+      }
+    });
+
+    if (!props.nut) {
+      throw new Error('Server values did not contain the required nut= property');
+    }
+    if (!props.tif) {
+      throw new Error('Server values did not contain the required tif= property');
+    }
+    if (!props.qry) {
+      throw new Error('Server values did not contain the required qry= property');
+    }
+
+    let askMessage: string | undefined;
+    let askButton1Label: string | undefined;
+    let askButton1Url: string | undefined;
+    let askButton2Label: string | undefined;
+    let askButton2Url: string | undefined;
+    if (props.ask) {
+      let parts: string[] = props.ask.split('~');
+      askMessage = parts[0];
+      let button1Parts = parts[1].split(';');
+      askButton1Label = button1Parts[0];
+      if (button1Parts.length > 1) {
+        askButton1Url = button1Parts[1];
+      }
+      if (parts.length > 2) {
+        let button2Parts = parts[2].split(';');
+        askButton2Label = button2Parts[0];
+        if (button2Parts.length > 1) {
+          askButton2Url = button2Parts[1];
+        }
+      }
+    }
+
+    return <ServerResponseInfo> {
+      supportedProtocolVersions: supportedVersions,
+      nextNut: props.nut,
+      tifValues: parseInt(props.tif, 16),
+      nextRequestPathAndQuery: props.qry,
+      successfulAuthenticationRedirectUrl: props.url,
+      secretIndex: props.sin,
+      serverUnlockKey: props.suk,
+      askMessage: askMessage,
+      askButton1Label: askButton1Label,
+      askButton1Url: askButton1Url,
+      askButton2Label: askButton2Label,
+      askButton2Url: askButton2Url      
+    };
+  }
 }
 
 /** The POST request body fields sent by the client to the server. Field names are defined by the SQRL standard. */
@@ -230,43 +234,6 @@ export class RequestPostBody {
   public ids: string;
   public pids?: string;
   public urs?: string;
-}
-
-/** Definitions for the Transaction Information Flag values specified in the SQRL specification. */
-export enum TIFFlags {
-  /** The web server found an identity association for the user based on the primary/current identity key. */
-  CurrentIDMatch = 0x01,
-
-  /** The web server found an identity association for the user based on the deprecated/previous identity key. */
-  PreviousIDMatch = 0x02,
-
-  /** The IP address seen at the server for this response is the same as the requester IP for the login page. */
-  IPAddressesMatch = 0x04,
-
-  /** The user's SQRL profile on the server has previously been marked disabled by the user. */
-  IDDisabled = 0x08,
-
-  /** The client's request contained an unknown or unsupported verb. 0x40 CommandFailed will also be set in this case. */
-  FunctionNotSupported = 0x10,
-
-  /**
-   * The server encountered an internal error and requests that the client reissue its request using the new nut
-   * and query information in this response.
-   */
-  TransientError = 0x20,
-
-  /** The command failed. If 0x80 ClientFailure is not set, this indicates a non-retryable problem at the server. */
-  CommandFailed = 0x40,
-
-  /** The command failure was because the client's request was malformed. */
-  ClientFailure = 0x80,
-
-  /**
-   * The SQRL ID specified in the client's request did not match the SQRL ID in ambient session
-   * identity referred to by the client's cookie. The user needs to use the correct SQRL ID or
-   * log out of the web site and log back in with a new identity.
-   */
-  BadIDAssociation = 0x100,
 }
 
 export class ServerResponseInfo {

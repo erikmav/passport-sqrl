@@ -26,7 +26,7 @@ import * as path from 'path';
 import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
 import { promisify } from 'util';
-import { AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut } from '../passport-sqrl';
+import { AuthCompletionInfo, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
 import { ILogger } from './Logging';
 
 // TypeScript definitions for http do not include an overload that allows the common
@@ -71,7 +71,11 @@ export class TestSiteHandler {
         port: port,
         urlPath: sqrlLoginRoute,
       },
-      (clientRequestInfo: ClientRequestInfo) => this.findAndUpdateOrCreateUser(clientRequestInfo));
+      (clientRequestInfo: ClientRequestInfo) => this.query(clientRequestInfo),
+      (clientRequestInfo: ClientRequestInfo) => this.ident(clientRequestInfo),
+      (clientRequestInfo: ClientRequestInfo) => this.disable(clientRequestInfo),
+      (clientRequestInfo: ClientRequestInfo) => this.enable(clientRequestInfo),
+      (clientRequestInfo: ClientRequestInfo) => this.remove(clientRequestInfo));
     passport.use(this.sqrlPassportStrategy);
     passport.serializeUser((user: UserDBRecord, done) => done(null, user.sqrlPrimaryIdentityPublicKey));
     passport.deserializeUser((id: any, done: (err: Error, doc: any) => void) => this.findUser(id, done));
@@ -194,6 +198,40 @@ export class TestSiteHandler {
     return this.nutTable.findOneAsync(new NutDBRecord(nut));
   }
 
+  private async query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+    // SQRL query. We don't create any new user records, just return whether we know about the user.
+    let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
+    if (authInfo.user != null && clientRequestInfo.returnSessionUnlockKey) {
+      let user = <UserDBRecord> authInfo.user;
+      authInfo.sessionUnlockKey = user.sqrlServerUnlockPublicKey;
+    }
+    return authInfo;
+  }
+
+  private async ident(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+    // SQRL login request.
+    let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
+
+    // TODO
+
+    return authInfo;
+  }
+
+  private disable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+    // SQRL identity disable request.
+    return Promise.resolve(new AuthCompletionInfo());  // TODO
+  }
+
+  private enable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+    // SQRL identity enable request.
+    return Promise.resolve(new AuthCompletionInfo());  // TODO
+  }
+
+  private remove(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+    // SQRL identity remove request.
+    return Promise.resolve(new AuthCompletionInfo());  // TODO
+  }
+
   private findUser(sqrlPublicKey: string, done: (err: Error, doc: any) => void): void {
     // Treat the SQRL client's public key as a primary search key in the database.
     let userDBRecord = <UserDBRecord> {
@@ -202,39 +240,67 @@ export class TestSiteHandler {
     this.userTable.findOne(userDBRecord, done);
   }
 
-  private async findAndUpdateOrCreateUser(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
-    try {
-      // Treat the SQRL client's public key as a primary search key in the database.
-      let searchRecord = <UserDBRecord> {
-        sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
-      };
-      let result = await this.userTable.findOneAsync(searchRecord);
-      if (result == null) {
-        // Not found by primary key. Maybe this is an identity change situation.
-        // If a previous key was provided, search again.
-        if (clientRequestInfo.previousIdentityPublicKey) {
-          searchRecord.sqrlPrimaryIdentityPublicKey = clientRequestInfo.previousIdentityPublicKey;
-          let prevKeyDoc: UserDBRecord = await this.userTable.findOneAsync(searchRecord);
-          if (prevKeyDoc == null) {
-            // Didn't already exist, create an initial version.
-            let newRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
-            result = await this.userTable.insertAsync(newRecord);
-          } else {
-            // The user has specified a new primary key, rearrange the record and update.
-            if (!prevKeyDoc.sqrlPreviousIdentityPublicKeys) {
-              prevKeyDoc.sqrlPreviousIdentityPublicKeys = [];
-            }
-            prevKeyDoc.sqrlPreviousIdentityPublicKeys.push(clientRequestInfo.previousIdentityPublicKey);
-            prevKeyDoc.sqrlPrimaryIdentityPublicKey = clientRequestInfo.primaryIdentityPublicKey;
-            await this.userTable.updateAsync(searchRecord, prevKeyDoc);
-            result = prevKeyDoc;
-          }
+  private async findUserByEitherKey(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+    let result = new AuthCompletionInfo();
+
+    // Treat the SQRL client's public key as a primary search key in the database.
+    let searchRecord = <UserDBRecord> {
+      sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
+    };
+    let primaryKeyDoc: UserDBRecord = await this.userTable.findOneAsync(searchRecord);
+    if (primaryKeyDoc != null) {
+      result.user = primaryKeyDoc;
+      /* tslint:disable:no-bitwise */
+      result.tifValues |= TIFFlags.CurrentIDMatch;
+      /* tslint:enable:no-bitwise */
+    } else {
+      // Not found by primary key. Maybe this is an identity change situation.
+      // If a previous key was provided, search again.
+      if (clientRequestInfo.previousIdentityPublicKey) {
+        searchRecord.sqrlPrimaryIdentityPublicKey = clientRequestInfo.previousIdentityPublicKey;
+        let prevKeyDoc: UserDBRecord = await this.userTable.findOneAsync(searchRecord);
+        if (prevKeyDoc) {
+          result.user = prevKeyDoc;
+          /* tslint:disable:no-bitwise */
+          result.tifValues |= TIFFlags.PreviousIDMatch;
+          /* tslint:enable:no-bitwise */
         }
       }
-      return <AuthCompletionInfo> { user: result };
-    } catch (err) {
-      return <AuthCompletionInfo> { err: err };
     }
+    return result;
+  }
+
+  private async findAndUpdateOrCreateUser(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+    // Treat the SQRL client's public key as a primary search key in the database.
+    let searchRecord = <UserDBRecord> {
+      sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
+    };
+    let result = await this.userTable.findOneAsync(searchRecord);
+    if (result == null) {
+      // Not found by primary key. Maybe this is an identity change situation.
+      // If a previous key was provided, search again.
+      if (clientRequestInfo.previousIdentityPublicKey) {
+        searchRecord.sqrlPrimaryIdentityPublicKey = clientRequestInfo.previousIdentityPublicKey;
+        let prevKeyDoc: UserDBRecord = await this.userTable.findOneAsync(searchRecord);
+        if (prevKeyDoc == null) {
+          // Didn't already exist, create an initial version if this is a login API request.
+          if (clientRequestInfo.sqrlCommand === 'ident') {
+            let newRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
+            result = await this.userTable.insertAsync(newRecord);
+          }
+        } else {
+          // The user has specified a new primary key, rearrange the record and update.
+          if (!prevKeyDoc.sqrlPreviousIdentityPublicKeys) {
+            prevKeyDoc.sqrlPreviousIdentityPublicKeys = [];
+          }
+          prevKeyDoc.sqrlPreviousIdentityPublicKeys.push(clientRequestInfo.previousIdentityPublicKey);
+          prevKeyDoc.sqrlPrimaryIdentityPublicKey = clientRequestInfo.primaryIdentityPublicKey;
+          await this.userTable.updateAsync(searchRecord, prevKeyDoc);
+          result = prevKeyDoc;
+        }
+      }
+    }
+    return <AuthCompletionInfo> { user: result };
   }
 }
 
@@ -324,7 +390,7 @@ class NutDBRecord {
   }
 }
 
-/** Returned from /pollNut call. login.ejs makes use of this. */
+/** Returned from /pollNut call. login.ejs makes use of this along with the cookie header. */
 class NutPollResult {
   public loggedIn: boolean;
   public redirectTo?: string;
