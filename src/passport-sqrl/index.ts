@@ -2,6 +2,7 @@
 
 import * as crypto from 'crypto';
 import * as express from 'express';
+import { AuthenticateOptions } from 'passport';
 import { Strategy } from 'passport-strategy';
 import { SqrlBodyParser } from './SqrlBodyParser';
 import { SqrlUrlFactory } from './SqrlUrlFactory';
@@ -156,7 +157,7 @@ export class SQRLStrategy extends Strategy {
    * PassportJS callback called when this strategy is configured on an HTTP(S)
    * POST route and a client call is received.
    */
-  public authenticate(req: express.Request, options?: any): void {
+  public authenticate(req: express.Request, options?: AuthenticateOptions): void {
     // Promisify to allow async coding style here and in unit tests.
     this.authenticateAsync(req, options)
       .then(authResult => {

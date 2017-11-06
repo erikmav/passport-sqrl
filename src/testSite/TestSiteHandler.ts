@@ -190,7 +190,7 @@ export class TestSiteHandler {
    *    ambient user profile reference in the cookie.
    */
   private async nutIssuedToLoginPageAsync(sqrlUrlAndNut: SQRLUrlAndNut): Promise<void> {
-    return this.nutTable.insertAsync(new NutDBRecord(sqrlUrlAndNut.getNutString(), sqrlUrlAndNut.url));
+    return this.nutTable.insertAsync(new NutDBRecord(sqrlUrlAndNut.nutString, sqrlUrlAndNut.url));
   }
 
   /** Returns null if not found. */
