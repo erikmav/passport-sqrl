@@ -2,11 +2,15 @@ import base64url from 'base64url';
 import { assert } from "chai";
 import * as crypto from 'crypto';
 import * as ed25519 from 'ed25519';
+import * as fs from 'fs';
 import * as request from 'request';
 import * as requestPromise from 'request-promise-native';
 import * as url from 'url';
 import { ClientRequestInfo, TIFFlags } from '../passport-sqrl';
 import { SqrlBodyParser } from '../passport-sqrl/SqrlBodyParser';
+
+const serverTlsCertDir = __dirname;
+const serverTlsCert = serverTlsCertDir + "/SQRLTestSite.FullChain.pem";
 
 /**
  * Implements the logic for a minimal SQRL client, used for generating mock call data for unit tests
@@ -51,6 +55,7 @@ export class MockSQRLClient {
   
   private primaryIdentityPrivateKey: Buffer;
   private previousIdentityPrivateKeys: Buffer[] = [];
+  private certValidationList: Buffer[];
   
   constructor(sqrlUrl: string, numPreviousIdentities: number = 0) {
     this.originalSqrlUrl = sqrlUrl;
@@ -70,12 +75,23 @@ export class MockSQRLClient {
       this.previousIdentityPublicKeys.push(keyPair.publicKey);
       this.previousIdentityPrivateKeys.push(keyPair.privateKey);
     }
+
+    // Set up TLS acceptance list for the self-signed cert on the test site.
+    // http://www.benjiegillam.com/2012/06/node-dot-js-ssl-certificate-chain/
+    let testSiteCertChain = fs.readFileSync(serverTlsCert);
+    this.certValidationList = [ testSiteCertChain ];
   }
 
   /** Performs an HTTP(S) call to a server. */
   public async performInitialQuery(): Promise<ServerResponseInfo> {
     let postBody: RequestPostBody = this.generatePostBody('query');
     let reqOptions = <requestPromise.RequestPromiseOptions> {
+      ca: this.certValidationList,
+      agentOptions: {
+        ca: this.certValidationList
+      },
+      rejectUnauthorized: false,
+
       method: 'POST',
       form: postBody
     };

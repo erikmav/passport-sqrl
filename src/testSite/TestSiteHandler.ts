@@ -26,6 +26,7 @@ import * as passport from 'passport';
 import * as path from 'path';
 import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
+import * as spdy from 'spdy';
 import { promisify } from 'util';
 import { AuthCompletionInfo, ClientRequestInfo, SQRLExpress, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
 import { ILogger } from './Logging';
@@ -47,6 +48,10 @@ declare module 'nedb' {
 (<any> neDB).prototype.findOneAsync = promisify(neDB.prototype.findOne);
 (<any> neDB).prototype.insertAsync = promisify(neDB.prototype.insert);
 (<any> neDB).prototype.updateAsync = promisify(neDB.prototype.update);
+
+const serverTlsCertDir = __dirname;
+const serverTlsKey = serverTlsCertDir + "/SQRLTestSite.PrivateKey.pem";
+const serverTlsCert = serverTlsCertDir + "/SQRLTestSite.FullChain.pem";
 
 export class TestSiteHandler {
   private testSiteServer: http.Server;
@@ -193,7 +198,23 @@ export class TestSiteHandler {
       })
       .use(express.static(webSiteDir));  // Serve static scripts and assets. Must come after non-file (e.g. templates, REST) middleware
 
-    this.testSiteServer = http.createServer(app);
+    this.testSiteServer = spdy.server.create(<spdy.server.ServerOptions> {
+      // Leaf cert PEM files for server certificate. See CreateLeaf.cmd and related scripts.
+      cert: fs.readFileSync(serverTlsCert),
+      key: fs.readFileSync(serverTlsKey),
+
+      // SPDY module supports Bunyan.
+      // TODO: Seems like we need a way to bypass TS strong typing:  log: log,
+
+      // SPDY-specific options
+      spdy: {
+        plain: false,
+        connection: {
+          windowSize: 1024 * 1024,
+        },
+        protocols: ['h2', 'http/1.1'],
+      },
+    }, app);
     log.info(`Test server listening on ${sqrlConfig.localDomainName}:${port}`);
     this.testSiteServer.listen(port, sqrlConfig.localDomainName);
   }

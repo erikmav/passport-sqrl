@@ -14,6 +14,8 @@ import { ILogger, LogLevel } from '../testSite/Logging';
 import * as testSite from '../testSite/TestSiteHandler';
 
 const testSitePort = 14001;
+const serverTlsCertDir = __dirname;
+const serverTlsCert = serverTlsCertDir + "/SQRLTestSite.FullChain.pem";
 
 class MockLogger implements ILogger {
   public logLevel: LogLevel;
@@ -42,8 +44,9 @@ describe('SqrlTestSite_Integration', () => {
       let site = new testSite.TestSiteHandler(mockLogger, testSitePort, 'localhost');
 
       let baseUrl = getWebBaseUrl();
+      let requestOpt = createRequestJsOptions();
       console.log(`Calling ${baseUrl}`);
-      let htmlString: string = await requestPromise(baseUrl);
+      let htmlString: string = await requestPromise(baseUrl, requestOpt);
       assert(htmlString.indexOf("Welcome! Please log in with SQRL") > 0, htmlString);
 
       site.close();
@@ -56,8 +59,9 @@ describe('SqrlTestSite_Integration', () => {
       let site = new testSite.TestSiteHandler(mockLogger, testSitePort, 'localhost');
 
       let loginUrl = getWebBaseUrl() + '/login';
+      let requestOpt = createRequestJsOptions();
       console.log(`Calling ${loginUrl}`);
-      let htmlString: string = await requestPromise(loginUrl);
+      let htmlString: string = await requestPromise(loginUrl, requestOpt);
       
       let startSqrlUrl = htmlString.indexOf('<a class="qr-code" href="');
       assert(startSqrlUrl > 0, 'SQRL URL link not found');
@@ -100,4 +104,18 @@ function pollForCondition(cond: () => boolean, done: (err?: Error) => void, star
       }
     }
   }, 10);
+}
+
+function createRequestJsOptions(): request.CoreOptions {
+  // http://www.benjiegillam.com/2012/06/node-dot-js-ssl-certificate-chain/
+  let testSiteCert = fs.readFileSync(serverTlsCert);
+  let certValidationList = [ testSiteCert ];
+
+  return <request.CoreOptions> {
+    ca: certValidationList,
+    agentOptions: {
+      ca: certValidationList
+    },
+    rejectUnauthorized: false
+  };
 }
