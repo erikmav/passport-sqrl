@@ -32,12 +32,28 @@ You can also run the build in the Windows console if you need to by running the 
 A "pure" unit test suite for the passport-sqrl code is under the src/SqrlTests directory and built into the build, and its failure causes the build to fail.
 
 ## Integration tests
-There is a suite of tests that start up a Node server with Express, passport, and passport-sqrl for integration testing. These are not "pure" unit tests but they also cause the build to fail if they are not working.
+There is a suite of tests that start up a Node server with Express, Passport, and passport-sqrl for integration testing. These are not "pure" unit tests but they also cause the build to fail if they are not working.
 
 You'll need to be on a network for these to work. (Running in airplane mode will cause failures. But many flights have wifi. :)
 
 ## Browser testing
-The same NodeJS + Express + passport + passport-sqrl web site can be run from VSCode. It uses HTTP on port 5858.
+The same NodeJS + Express + Passport + passport-sqrl web site can be run from VSCode. It uses HTTPS on port 5858.
+
+To run the site:
+
+1. Press the F5 key while in VSCode.
+1. If a warning bar about build errors appears, click Debug Anyway
+1. If a firewall popup appears, allow Node.js to open port 5858
+1. Wait for the orange debugging color to appear in the status bar.
+
+Then:
+
+1. Open a browser and navigate to https://your-machine-name:5858
+1. Allow a security exception for the self-signed certificate.
+1. You should be redirected to the /login page and see a SQRL QR-Code that can also be clicked.
+1. When clicked, the desktop SQRL client should activate to handle the sqrl:// URL and allow you to log in.
+
+'''NOTE: Desktop flow is broken because of the self-signed certificate'''
 
 ## Useful Links
 
