@@ -39,7 +39,7 @@ describe('SqrlTestSite_Integration', () => {
   describe('InitialBrowserRequestNoCookieRedirectedToLogin', () => {
     it('should redirect a fresh, cookieless connection to the /login route', async () => {
       let mockLogger = new MockLogger();
-      let site = new testSite.TestSiteHandler(mockLogger, testSitePort);
+      let site = new testSite.TestSiteHandler(mockLogger, testSitePort, 'localhost');
 
       let baseUrl = getWebBaseUrl();
       console.log(`Calling ${baseUrl}`);
@@ -53,7 +53,7 @@ describe('SqrlTestSite_Integration', () => {
   describe('GetLoginPageCallSqrlUrlFromExternalClient', () => {
     it('should allow an external client, simulating a browser plugin or phone app, to log the user in using the SQRL URL generated on a page', async () => {
       let mockLogger = new MockLogger();
-      let site = new testSite.TestSiteHandler(mockLogger, testSitePort);
+      let site = new testSite.TestSiteHandler(mockLogger, testSitePort, 'localhost');
 
       let loginUrl = getWebBaseUrl() + '/login';
       console.log(`Calling ${loginUrl}`);

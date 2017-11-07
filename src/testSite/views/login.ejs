@@ -1,25 +1,36 @@
 <script>
-  let loginTextElement = document.getElementById('login-text');
-  
-  // Poll the back-end to see if a phone login has occurred.
-  const nutCheckIntervalMsec = 500;
-  settimeout(pollNut, nutCheckIntervalMsec);
+  const nutCheckIntervalMsec = 1000;
+  const spinChars = [ '|', '/', '-', '\\' ];
+  let spinIndex = 0;
+
+  $(document).ready(() => {
+    // Poll the back-end to see if a phone login has occurred.
+    setTimeout(pollNut, nutCheckIntervalMsec);
+  });
+
+  function resetLoginText() {
+    spinIndex = (spinIndex + 1) % spinChars.length;
+    $('#login-text').text(spinChars[spinIndex]);
+    setTimeout(pollNut, nutCheckIntervalMsec / 2);
+  }
 
   function pollNut() {
-    $.get("/pollNut/<%= sqrlNut %>", {
+    spinIndex = (spinIndex + 1) % spinChars.length;
+    $('#login-text').text(spinChars[spinIndex] + ' Polling nut /pollNut/<%= sqrlNut %>');
+    $.get({
+      url: "/pollNut/<%= sqrlNut %>",
       cache: false,
-      error: (jqXHR, textStatus, errorThrown) => $("#login-text").innerText = `ERROR getting nut status: ${textStatus}: ${errorThrown}`,
+      error: (jqXHR, textStatus, errorThrown) => $("#login-text").text(`ERROR getting nut status: ${textStatus}: ${errorThrown}`),
       success: (data, textStatus, jqXHR) => {
         // Store the login cookie value and Redirect the page if the nut was logged in.
         // Data is a NutPollResult
-        if (data.loggedIn) {
-          $("#login-text").innerText = `Success! Storing cookie value (${result.cookie}) and redirecting in a few seconds`;
+        if (data && data.loggedIn) {
+          $("#login-text").text(`Success! Storing cookie value (${result.cookie}) and redirecting in a few seconds`);
           document.cookie = data.cookie;
-          settimeout(() => window.location.href = data.redirectTo, 4000);
+          setTimeout(() => window.location.href = data.redirectTo, 4000);
         } else {
           // Normal case: No login.
-          $("#login-text").innerText += ".";
-          settimeout(pollNut, nutCheckIntervalMsec);
+          setTimeout(resetLoginText, nutCheckIntervalMsec / 2);
         }
       }
     });
@@ -31,4 +42,4 @@
 <p>
   <a class="qr-code" href="<%= sqrlUrl %>"><%- sqrlQR %></a>
 </p>
-<p id="login-text"></p>
+<p id="login-text">Status...</p>

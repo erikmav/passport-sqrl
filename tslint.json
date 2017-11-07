@@ -12,7 +12,8 @@
         "no-empty": false,
         "object-literal-sort-keys": false,
         "object-literal-shorthand": false,
-        "trailing-comma": false
+        "trailing-comma": false,
+        "forin": false
     },
     "linterOptions": {
         "exclude": [ "**/*.d.ts" ]

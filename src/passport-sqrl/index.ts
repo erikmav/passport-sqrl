@@ -246,7 +246,6 @@ export class SQRLExpress {
     // The await here will throw any exceptions outward to the
     // authenticate() callback handler.
     let authCompletion: AuthCompletionInfo = await callback(clientRequestInfo);
-    console.log(`erik: cmd ${clientRequestInfo.sqrlCommand}, user? ${authCompletion.user}`);
     return <AuthenticateAsyncResult> {
       user: authCompletion.user,
       body: this.authCompletionToResponseBody(clientRequestInfo, authCompletion),
@@ -395,7 +394,6 @@ export class SQRLStrategy extends Strategy {
     // Fill in the nut and next URL before the callback to let them be stored during the call.
     clientRequestInfo.nextNut = SqrlUrlFactory.nutToString(this.nutGenerator(req));
 
-    console.log(`erik: choosing from ${clientRequestInfo.sqrlCommand}`);
     let callback: AuthCallback;
     switch (clientRequestInfo.sqrlCommand) {
       case 'query':
@@ -420,7 +418,6 @@ export class SQRLStrategy extends Strategy {
     // The await here will throw any exceptions outward to the
     // authenticate() callback handler.
     let authCompletion: AuthCompletionInfo = await callback(clientRequestInfo);
-    console.log(`erik: cmd ${clientRequestInfo.sqrlCommand}, user? ${authCompletion.user}`);
     return <AuthenticateAsyncResult> {
       user: authCompletion.user,
       body: this.authCompletionToResponseBody(clientRequestInfo, authCompletion),

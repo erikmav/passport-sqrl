@@ -21,6 +21,7 @@ import * as expressSession from 'express-session';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as neDB from 'nedb';
+import * as os from 'os';
 import * as passport from 'passport';
 import * as path from 'path';
 import * as qr from 'qr-image';
@@ -55,7 +56,7 @@ export class TestSiteHandler {
   private nutTable: neDB;
   private log: ILogger;
 
-  constructor(log: ILogger, port: number = 5858) {
+  constructor(log: ILogger, port: number = 5858, domainName: string | null = null) {
     this.log = log;
     let webSiteDir = path.join(__dirname, 'WebSite');
     const sqrlApiRoute = '/sqrl';
@@ -67,24 +68,21 @@ export class TestSiteHandler {
     this.userTable = new neDB(<neDB.DataStoreOptions> { inMemoryOnly: true });
     this.nutTable = new neDB(<neDB.DataStoreOptions> { inMemoryOnly: true });
 
-    this.sqrlApiHandler = new SQRLExpress(<SQRLStrategyConfig> {
-        secure: false,
-        localDomainName: 'localhost',
-        port: port,
-        urlPath: sqrlApiRoute,
-      },
+    let sqrlConfig = <SQRLStrategyConfig> {
+      secure: true,
+      localDomainName: domainName || this.getLocalIPAddresses()[0],
+      port: port,
+      urlPath: sqrlApiRoute,
+    };
+
+    this.sqrlApiHandler = new SQRLExpress(sqrlConfig,
       (clientRequestInfo: ClientRequestInfo) => this.query(clientRequestInfo),
       (clientRequestInfo: ClientRequestInfo) => this.ident(clientRequestInfo),
       (clientRequestInfo: ClientRequestInfo) => this.disable(clientRequestInfo),
       (clientRequestInfo: ClientRequestInfo) => this.enable(clientRequestInfo),
       (clientRequestInfo: ClientRequestInfo) => this.remove(clientRequestInfo));
 
-    this.sqrlPassportStrategy = new SQRLStrategy(<SQRLStrategyConfig> {
-        secure: false,
-        localDomainName: 'localhost',
-        port: port,
-        urlPath: sqrlApiRoute,
-      },
+    this.sqrlPassportStrategy = new SQRLStrategy(sqrlConfig,
       (clientRequestInfo: ClientRequestInfo) => this.query(clientRequestInfo),
       (clientRequestInfo: ClientRequestInfo) => this.ident(clientRequestInfo),
       (clientRequestInfo: ClientRequestInfo) => this.disable(clientRequestInfo),
@@ -113,13 +111,16 @@ export class TestSiteHandler {
       .get(loginPageRoute, (req, res) => {
         this.log.debug('/login requested');
         let urlAndNut: SQRLUrlAndNut = this.sqrlPassportStrategy.getSqrlUrl(req);
-        let qrSvg = qr.imageSync(urlAndNut.url, { type: 'svg', parse_url: true });
-        res.render('login', {
-          subpageName: 'Log In',
-          sqrlUrl: urlAndNut.url,
-          sqrlNut: urlAndNut.nutString,
-          sqrlQR: qrSvg
-        });
+        this.nutIssuedToLoginPageAsync(urlAndNut)
+          .then(() => {
+            let qrSvg = qr.imageSync(urlAndNut.url, { type: 'svg', parse_url: true });
+            res.render('login', {
+              subpageName: 'Log In',
+              sqrlUrl: urlAndNut.url,
+              sqrlNut: urlAndNut.nutString,
+              sqrlQR: qrSvg
+            });
+          });
       })
 
       // NOTE: No SuccessRedirect, FailureRedirect - this is a web API more than a normal login endpoint.
@@ -128,7 +129,10 @@ export class TestSiteHandler {
       .post(sqrlLoginRoute, passport.authenticate('sqrl'))
 
       // TODO: Keep? Refactor?
-      .post(sqrlApiRoute, this.sqrlApiHandler.HandleSqrlApi)
+      .post(sqrlApiRoute, (req, res, next) => {
+        this.log.debug(`/sqrl request: ${req.body}`);
+        this.sqrlApiHandler.HandleSqrlApi(req, res);
+      })
       
       // Used by login.ejs
       .get(pollNutRoute, (req, res) => {
@@ -136,32 +140,44 @@ export class TestSiteHandler {
           this.pollNutAsync(req.params.nut)
             .then(nutRecord => {
               if (!nutRecord) {
+                this.log.debug(`pollNut: ${req.params.nut}: No nut record, returning 404`);
                 res.statusCode = 404;
+                res.end();
               } else if (!nutRecord.loggedIn || !nutRecord.clientPrimaryIdentityPublicKey) {
-                res.set(<NutPollResult> { loggedIn: false });
+                this.log.debug(`pollNut: ${req.params.nut}: Nut not logged in`);
+                res.send(<NutPollResult> { loggedIn: false });
               } else {
                 this.findUser(nutRecord.clientPrimaryIdentityPublicKey, (err: Error, userDBRecord: UserDBRecord | null) => {
-                  // Ensure the cookie header for the response is set the way Passport normally does it.
-                  req.login(userDBRecord, loginErr => {
-                    if (loginErr) {
-                      res.statusCode = 400;
-                      res.statusMessage = loginErr.toString();
-                    } else {
-                      res.set(<NutPollResult> {
-                        loggedIn: nutRecord.loggedIn,
-                        redirectTo: loginSuccessRedirect
-                      });
-                    }
-                  });
+                  if (err) {
+                    this.log.debug(`pollNut: ${req.params.nut}: Error finding user: ${err}`);
+                    res.statusCode = 500;
+                    res.send(err.toString());
+                  } else {
+                    this.log.debug(`pollNut: ${req.params.nut}: Nut logged in, logging user in via PassportJS`);
+                    // Ensure the cookie header for the response is set the way Passport normally does it.
+                    req.login(userDBRecord, loginErr => {
+                      if (loginErr) {
+                        this.log.debug(`pollNut: ${req.params.nut}: PassportJS login failed: ${loginErr}`);
+                        res.statusCode = 400;
+                        res.send(loginErr.toString());
+                      } else {
+                        res.send(<NutPollResult> {
+                          loggedIn: nutRecord.loggedIn,
+                          redirectTo: loginSuccessRedirect
+                        });
+                      }
+                    });
+                  }
                 });
               }
             })
             .catch(reason => {
               res.statusCode = 400;
-              res.statusMessage = reason;
+              res.send(reason);
             });
         } else {
           res.statusCode = 404;
+          res.end();
         }
       })
       .get('/', (req, res) => {
@@ -179,8 +195,8 @@ export class TestSiteHandler {
       .use(express.static(webSiteDir));  // Serve static scripts and assets. Must come after non-file (e.g. templates, REST) middleware
 
     this.testSiteServer = http.createServer(app);
-    log.info(`Test server listening on port ${port}`);
-    this.testSiteServer.listen(port);
+    log.info(`Test server listening on ${sqrlConfig.localDomainName}:${port}`);
+    this.testSiteServer.listen(port, sqrlConfig.localDomainName);
   }
 
   public close(): void {
@@ -208,12 +224,12 @@ export class TestSiteHandler {
    *    ambient user profile reference in the cookie.
    */
   private async nutIssuedToLoginPageAsync(sqrlUrlAndNut: SQRLUrlAndNut): Promise<void> {
-    return this.nutTable.insertAsync(new NutDBRecord(sqrlUrlAndNut.nutString, sqrlUrlAndNut.url));
+    return (<any> this.nutTable).insertAsync(new NutDBRecord(sqrlUrlAndNut.nutString, sqrlUrlAndNut.url));
   }
 
   /** Returns null if not found. */
   private async pollNutAsync(nut: string): Promise<NutDBRecord | null> {
-    return this.nutTable.findOneAsync(new NutDBRecord(nut));
+    return (<any> this.nutTable).findOneAsync(<NutDBRecord> { nut: nut });
   }
 
   private async query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
@@ -227,12 +243,11 @@ export class TestSiteHandler {
   }
 
   private async ident(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
-    console.log('erik: ident entry');
     // SQRL login request.
     let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
     if (authInfo.user) {
-      /* tslint:disable:no-bitwise */
-      if (authInfo.tifValues & TIFFlags.PreviousIDMatch) {  /* tslint:enable:no-bitwise */
+      // tslint:disable-next-line:no-bitwise
+      if (authInfo.tifValues & TIFFlags.PreviousIDMatch) {
         // The user has specified a new primary key, rearrange the record and update.
         let user = authInfo.user;
         if (!user.sqrlPreviousIdentityPublicKeys) {
@@ -243,15 +258,14 @@ export class TestSiteHandler {
         let searchRecord = <UserDBRecord> {
           sqrlPrimaryIdentityPublicKey: clientRequestInfo.previousIdentityPublicKey
         };
-        await this.userTable.updateAsync(searchRecord, user);
+        await (<any> this.userTable).updateAsync(searchRecord, user);
       }
       return authInfo;
     }
 
     // Didn't already exist, create an initial version if this is a login API request.
     let newRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
-    let result: UserDBRecord = await this.userTable.insertAsync(newRecord);
-    console.log(`erik: after insert user? ${result}`);
+    let result: UserDBRecord = await (<any> this.userTable).insertAsync(newRecord);
     authInfo.user = result;
     authInfo.tifValues = 0;
     return authInfo;
@@ -287,23 +301,21 @@ export class TestSiteHandler {
     let searchRecord = <UserDBRecord> {
       sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
     };
-    let primaryKeyDoc: UserDBRecord = await this.userTable.findOneAsync(searchRecord);
+    let primaryKeyDoc: UserDBRecord = await (<any> this.userTable).findOneAsync(searchRecord);
     if (primaryKeyDoc != null) {
       result.user = primaryKeyDoc;
-      /* tslint:disable:no-bitwise */
+      // tslint:disable-next-line:no-bitwise
       result.tifValues |= TIFFlags.CurrentIDMatch;
-      /* tslint:enable:no-bitwise */
     } else {
       // Not found by primary key. Maybe this is an identity change situation.
       // If a previous key was provided, search again.
       if (clientRequestInfo.previousIdentityPublicKey) {
         searchRecord.sqrlPrimaryIdentityPublicKey = clientRequestInfo.previousIdentityPublicKey;
-        let prevKeyDoc: UserDBRecord = await this.userTable.findOneAsync(searchRecord);
+        let prevKeyDoc: UserDBRecord = await (<any> this.userTable).findOneAsync(searchRecord);
         if (prevKeyDoc) {
           result.user = prevKeyDoc;
-          /* tslint:disable:no-bitwise */
+          // tslint:disable-next-line:no-bitwise
           result.tifValues |= TIFFlags.PreviousIDMatch;
-          /* tslint:enable:no-bitwise */
         }
       }
     }
@@ -315,18 +327,18 @@ export class TestSiteHandler {
     let searchRecord = <UserDBRecord> {
       sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
     };
-    let result = await this.userTable.findOneAsync(searchRecord);
+    let result = await (<any> this.userTable).findOneAsync(searchRecord);
     if (result == null) {
       // Not found by primary key. Maybe this is an identity change situation.
       // If a previous key was provided, search again.
       if (clientRequestInfo.previousIdentityPublicKey) {
         searchRecord.sqrlPrimaryIdentityPublicKey = clientRequestInfo.previousIdentityPublicKey;
-        let prevKeyDoc: UserDBRecord = await this.userTable.findOneAsync(searchRecord);
+        let prevKeyDoc: UserDBRecord = await (<any> this.userTable).findOneAsync(searchRecord);
         if (prevKeyDoc == null) {
           // Didn't already exist, create an initial version if this is a login API request.
           if (clientRequestInfo.sqrlCommand === 'ident') {
             let newRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
-            result = await this.userTable.insertAsync(newRecord);
+            result = await (<any> this.userTable).insertAsync(newRecord);
           }
         } else {
           // The user has specified a new primary key, rearrange the record and update.
@@ -335,7 +347,7 @@ export class TestSiteHandler {
           }
           prevKeyDoc.sqrlPreviousIdentityPublicKeys.push(clientRequestInfo.previousIdentityPublicKey);
           prevKeyDoc.sqrlPrimaryIdentityPublicKey = clientRequestInfo.primaryIdentityPublicKey;
-          await this.userTable.updateAsync(searchRecord, prevKeyDoc);
+          await (<any> this.userTable).updateAsync(searchRecord, prevKeyDoc);
           result = prevKeyDoc;
         }
       }
@@ -343,6 +355,22 @@ export class TestSiteHandler {
     let authInfo = new AuthCompletionInfo();
     authInfo.user = result;
     return authInfo;
+  }
+
+  private getLocalIPAddresses(): string[] {
+    let interfaces = os.networkInterfaces();
+    let addresses: string[] = [];
+    // tslint:disable-next-line:forin
+    for (let k in interfaces) {
+      // tslint:disable-next-line:forin
+      for (let k2 in interfaces[k]) {
+        let address = interfaces[k][k2];
+        if (address.family === 'IPv4' && !address.internal) {
+          addresses.push(address.address);
+        }
+      }
+    }
+    return addresses;
   }
 }
 
@@ -376,7 +404,8 @@ class UserDBRecord {
   }
 
   // _id is implicit from NeDB.
-  /* tslint:disable */ public _id?: string; /* tslint:enable */
+  // tslint:disable-next-line
+  public _id?: string;
   
   /** User name. Could be filled in from any login form submitted from the client. */
   public name?: string;
@@ -408,7 +437,8 @@ class UserDBRecord {
 
 class NutDBRecord {
   // _id is implicit from NeDB.
-  /* tslint:disable */ public _id?: string; /* tslint:enable */
+  // tslint:disable-next-line
+  public _id?: string;
 
   /** The unique nut nonce generated and sent to a client. */
   public nut: string;
