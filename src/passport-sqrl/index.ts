@@ -128,7 +128,6 @@ export class SQRLExpress {
     this.removeCallback = remove;
 
     this.urlFactory = new SqrlUrlFactory(
-        config.secure,
         config.localDomainName,
         config.port,
         config.urlPath,
@@ -330,7 +329,6 @@ export class SQRLStrategy extends Strategy {
     this.removeCallback = remove;
 
     this.urlFactory = new SqrlUrlFactory(
-        config.secure,
         config.localDomainName,
         config.port,
         config.urlPath,
@@ -639,9 +637,6 @@ export class ClientRequestInfo {
 
 /** Provided to the SQRL strategy constructor to provide configuration information. */
 export class SQRLStrategyConfig {
-  /** Whether the site uses TLS and the 'sqrl://' (as opposed to 'qrl://') URL scheme should be generated. */
-  public secure: boolean;
-
   /** Provides the domain name to use in generating SQRL URLs to send to clients. */
   public localDomainName: string;
 

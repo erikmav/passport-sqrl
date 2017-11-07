@@ -9,16 +9,15 @@ describe('SQRLStrategy', () => {
   describe('getSqrlUrlNoNutGenerator', () => {
     it('should generate a 128-bit random value as the nut if no nut generator override is provided', () => {
       let sqrl = new MockSQRLStrategy(<SQRLStrategyConfig> {
-          secure: false,
           localDomainName: 'domain.com',
           urlPath: '/login',
           domainExtension: 6,
         });
 
       let urlAndNut: SQRLUrlAndNut = sqrl.getSqrlUrl(<express.Request> { });
-      assert.equal(urlAndNut.url.substring(0, 27), 'qrl://domain.com/login?nut=');
+      assert.equal(urlAndNut.url.substring(0, 28), 'sqrl://domain.com/login?nut=');
       // 22 characters of base64 for 128 bits - should be random
-      assert.equal(urlAndNut.url.substring(27 + 22), "&x=6");
+      assert.equal(urlAndNut.url.substring(28 + 22), "&x=6");
       assert.isNotNull(urlAndNut.nut);
 
       assert.equal(sqrl.queryCalls, 0);
@@ -32,7 +31,6 @@ describe('SQRLStrategy', () => {
   describe('getSqrlUrlCustomNutGenerator', () => {
     it('should accept a custom nut value from a nut generator specified by caller', () => {
       let sqrl = new MockSQRLStrategy(<SQRLStrategyConfig> {
-        secure: true,
         localDomainName: 'domain.com',
         urlPath: '/login',
         nutGenerator: (req: express.Request): string | Buffer => {

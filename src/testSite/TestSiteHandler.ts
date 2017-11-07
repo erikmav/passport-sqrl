@@ -69,7 +69,6 @@ export class TestSiteHandler {
     this.nutTable = new neDB(<neDB.DataStoreOptions> { inMemoryOnly: true });
 
     let sqrlConfig = <SQRLStrategyConfig> {
-      secure: true,
       localDomainName: domainName || this.getLocalIPAddresses()[0],
       port: port,
       urlPath: sqrlApiRoute,

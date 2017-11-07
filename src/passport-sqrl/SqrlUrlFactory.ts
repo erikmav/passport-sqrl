@@ -36,21 +36,18 @@ export function trimEqualsChars(s: string): string {
 export class SqrlUrlFactory {
   /**
    * Creates a SQRL URL from full "nut" metadata.
-   * @param secure Whether the server is using TLS, which maps to the 'sqrl://' or 'qrl://' schemes.
    * @param domain The site domain, e.g. "www.foo.com"
    * @param serverNut The opaque, unique server data generated for this URL, passed as the nut= query parameter.
    * @param pathString Optional path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
    * @param domainExtension When positive, specifies the value to place into the x= query parameter that tells the client how many characters of the pathString to include in its server key hash.
    */
   public static create(
-      secure: boolean,
       domain: string,
       serverNut: string | Buffer,
       port?: number,
       pathString?: string,
       domainExtension?: number)
       : string {
-    let scheme = secure ? 'sqrl' : 'qrl';
     let portPart = port ? `:${port}` : '';
 
     if (!pathString) {
@@ -74,7 +71,7 @@ export class SqrlUrlFactory {
 
     let nut: string = SqrlUrlFactory.nutToString(serverNut);
 
-    return `${scheme}://${domain}${portPart}${pathString}?nut=${nut}${domainExt}`;
+    return `sqrl://${domain}${portPart}${pathString}?nut=${nut}${domainExt}`;
   }
 
   public static nutToString(nut: string | Buffer): string {
@@ -87,7 +84,6 @@ export class SqrlUrlFactory {
     return nutStr;    
   }
 
-  private secure: boolean;
   private domain: string;
   private port: number | undefined;
   private pathString: string | undefined;
@@ -95,15 +91,13 @@ export class SqrlUrlFactory {
   
   /**
    * Creates a SQRL URL factory with static configuration information.
-   * @param secure Whether the server is using TLS, which maps to the 'sqrl://' or 'qrl://' schemes.
    * @param domain The site domain, e.g. "www.foo.com"
    * @param port Optional port.
    * @param pathString Optional path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
    * @param domainExtension When positive, specifies the value to place into the x= query parameter
    *   that tells the client how many characters of the pathString to include in its server key hash.
    */
-  constructor(secure: boolean, domain: string, port?: number, pathString?: string, domainExtension?: number) {
-    this.secure = secure;
+  constructor(domain: string, port?: number, pathString?: string, domainExtension?: number) {
     this.domain = domain;
     this.port = port;
     this.pathString = pathString;
@@ -121,7 +115,6 @@ export class SqrlUrlFactory {
    */
   public create(serverNut: string | Buffer, pathString?: string, domainExtension?: number): string {
     return SqrlUrlFactory.create(
-        this.secure,
         this.domain,
         serverNut,
         this.port,

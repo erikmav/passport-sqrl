@@ -298,8 +298,8 @@ describe('SQRLClient', () => {
   describe('canonicalizePreCanonicalized', () => {
     it('should generate the same canonicalized URLs', () => {
       let testUrls: string[] = [
-        'qrl://foo.com',
-        'qrl://foo.com/bar?blah=boo',
+        'sqrl://foo.com',
+        'sqrl://foo.com/bar?blah=boo',
         'sqrl://foo.com?bar=blah',
       ];
 
@@ -310,7 +310,7 @@ describe('SQRLClient', () => {
 
   describe('canonicalizeNonCanonicalized', () => {
     it('should generate proper canonicalized URLs', () => {
-      assert.equal(MockSQRLClient.canonicalizeSqrlUrl('qrl://user:pass@www.foo.com'), 'qrl://www.foo.com');
+      assert.equal(MockSQRLClient.canonicalizeSqrlUrl('sqrl://user:pass@www.foo.com'), 'sqrl://www.foo.com');
       assert.equal(MockSQRLClient.canonicalizeSqrlUrl('sqrl://foo.com:12345'), 'sqrl://foo.com');
       assert.equal(MockSQRLClient.canonicalizeSqrlUrl('sqrl://foo.com:12345/path?query=1'), 'sqrl://foo.com/path?query=1');
       assert.equal(MockSQRLClient.canonicalizeSqrlUrl('SQrL://FOO.com:12345/Path?query=UPPERCASE'), 'sqrl://foo.com/Path?query=UPPERCASE');
@@ -319,7 +319,7 @@ describe('SQRLClient', () => {
 
   describe('generateServerContactUrl', () => {
     it('should generate proper contact URLs', () => {
-      assert.equal(MockSQRLClient.generateServerContactUrl('qrl://user:pass@www.foo.com'), 'http://www.foo.com');
+      assert.equal(MockSQRLClient.generateServerContactUrl('sqrl://user:pass@www.foo.com'), 'https://www.foo.com');
       assert.equal(MockSQRLClient.generateServerContactUrl('sqrl://foo.com:12345'), 'https://foo.com:12345');
       assert.equal(MockSQRLClient.generateServerContactUrl('sqrl://foo.com:12345/path?query=1'), 'https://foo.com:12345/path?query=1');
       assert.equal(MockSQRLClient.generateServerContactUrl('SQrL://FOO.com:12345/Path?query=UPPERCASE'), 'https://foo.com:12345/Path?query=UPPERCASE');

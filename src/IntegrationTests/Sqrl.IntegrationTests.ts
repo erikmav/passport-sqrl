@@ -84,7 +84,7 @@ describe('SqrlTestSite_Integration', () => {
 });
 
 function getWebBaseUrl(): string {
-  return "http://localhost:" + testSitePort;
+  return "https://localhost:" + testSitePort;
 }
 
 function pollForCondition(cond: () => boolean, done: (err?: Error) => void, start: number, timeoutMs: number) {

@@ -6,49 +6,49 @@ import { SqrlUrlFactory, toSqrlBase64, trimEqualsChars } from '../passport-sqrl/
 describe('SqrlUrlFactory', () => {
   describe('StaticUrlCreationChecks', () => {
     it('should return the expected URL format from various parameter configurations passed to SqlUrlFactory.create()', () => {
-      let url = SqrlUrlFactory.create(false, 'foo.com', "secure1");
-      assert.equal(url, 'qrl://foo.com?nut=secure1');
+      let url = SqrlUrlFactory.create('foo.com', "secure1");
+      assert.equal(url, 'sqrl://foo.com?nut=secure1');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure2", undefined, '/sqrlLogin');
+      url = SqrlUrlFactory.create('www.foo.com', "secure2", undefined, '/sqrlLogin');
       assert.equal(url, 'sqrl://www.foo.com/sqrlLogin?nut=secure2');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', new Buffer("secure3"), undefined, 'sqrlLogin2?');
+      url = SqrlUrlFactory.create('www.foo.com', new Buffer("secure3"), undefined, 'sqrlLogin2?');
       assert.equal(url, 'sqrl://www.foo.com/sqrlLogin2?nut=c2VjdXJlMw');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure4", undefined, '');
+      url = SqrlUrlFactory.create('www.foo.com', "secure4", undefined, '');
       assert.equal(url, 'sqrl://www.foo.com?nut=secure4');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure5", undefined, '', 1);
+      url = SqrlUrlFactory.create('www.foo.com', "secure5", undefined, '', 1);
       assert.equal(url, 'sqrl://www.foo.com?nut=secure5');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure6", 1234, 'someuser', 1);
+      url = SqrlUrlFactory.create('www.foo.com', "secure6", 1234, 'someuser', 1);
       assert.equal(url, 'sqrl://www.foo.com:1234/someuser?nut=secure6&x=1');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure7", 1234, 'someuser', 1000);
+      url = SqrlUrlFactory.create( 'www.foo.com', "secure7", 1234, 'someuser', 1000);
       assert.equal(url, 'sqrl://www.foo.com:1234/someuser?nut=secure7&x=9');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure8", 1234, '/someuser?', 1000);
+      url = SqrlUrlFactory.create('www.foo.com', "secure8", 1234, '/someuser?', 1000);
       assert.equal(url, 'sqrl://www.foo.com:1234/someuser?nut=secure8&x=9');
 
-      url = SqrlUrlFactory.create(true, 'www.foo.com', "secure9", /*path*/undefined, /*domainExt*/undefined);
+      url = SqrlUrlFactory.create('www.foo.com', "secure9", /*path*/undefined, /*domainExt*/undefined);
       assert.equal(url, 'sqrl://www.foo.com?nut=secure9');
     });
   });
 
   describe('FactoryCreationChecks', () => {
     it('should return the expected URL format from various parameter configurations passed to an instance of SqlUrlFactory', () => {
-      let factory = new SqrlUrlFactory(true, 'foo.com', undefined, '/sqrlLogin');
+      let factory = new SqrlUrlFactory('foo.com', undefined, '/sqrlLogin');
       let url = factory.create("secure1");
       assert.equal(url, 'sqrl://foo.com/sqrlLogin?nut=secure1');
 
-      factory = new SqrlUrlFactory(false, 'foo.com');
+      factory = new SqrlUrlFactory('foo.com');
       url = factory.create("secure2");
-      assert.equal(url, 'qrl://foo.com?nut=secure2');
+      assert.equal(url, 'sqrl://foo.com?nut=secure2');
 
       url = factory.create("secure3", "/login");
-      assert.equal(url, 'qrl://foo.com/login?nut=secure3');
+      assert.equal(url, 'sqrl://foo.com/login?nut=secure3');
 
-      factory = new SqrlUrlFactory(true, 'foo.com', 9999, '/login', 6);
+      factory = new SqrlUrlFactory('foo.com', 9999, '/login', 6);
       url = factory.create("secure4");
       assert.equal(url, 'sqrl://foo.com:9999/login?nut=secure4&x=6');
     });
