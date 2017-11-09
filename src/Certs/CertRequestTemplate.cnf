@@ -1,0 +1,46 @@
+# For use CreateRoot.cmd, CreateIntermediate.cmd, CreateLeaf.cmd
+# Adapted from one of the answers at:
+# https://stackoverflow.com/questions/10175812/how-to-create-a-self-signed-certificate-with-openssl#10176685
+
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_leaf_policy
+prompt = no
+
+[req_distinguished_name]
+C = US
+ST = WA
+L = Bothell
+O = passport-sqrl
+CN = localhost
+
+# Root CA policy used from CreateRoot.cmd
+# See https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
+[v3_root_ca_policy]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+# Intermediate CA policy used from CreateIntermediate.cmd
+# See https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
+[v3_intermediate_ca_policy]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true, pathlen:0
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+# Leaf CA policy used from CreateLeaf.cmd
+# See https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
+[v3_leaf_policy]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+basicConstraints = CA:FALSE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = 127.0.0.1
+DNS.3 = ::1

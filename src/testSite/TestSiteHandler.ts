@@ -31,10 +31,12 @@ import { promisify } from 'util';
 import { AuthCompletionInfo, ClientRequestInfo, SQRLExpress, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
 import { ILogger } from './Logging';
 
-// TypeScript definitions for http do not include an overload that allows the common
+// TypeScript definitions for SPDY do not include an overload that allows the common
 // Express app pattern as a param. Inject an overload to avoid compilation errors.
-declare module 'http' {
-  export function createServer(handler: express.Application): Server;
+declare module 'spdy' {
+  namespace server {
+    export function create(options: ServerOptions, handler: express.Application): Server;
+  }
 }
 
 // Promisify extensions.
@@ -50,11 +52,11 @@ declare module 'nedb' {
 (<any> neDB).prototype.updateAsync = promisify(neDB.prototype.update);
 
 const serverTlsCertDir = __dirname;
-const serverTlsKey = serverTlsCertDir + "/SQRLTestSite.PrivateKey.pem";
-const serverTlsCert = serverTlsCertDir + "/SQRLTestSite.FullChain.pem";
+const serverTlsKey = serverTlsCertDir + "/TestSite.PrivateKey.pem";
+const serverTlsCert = serverTlsCertDir + "/TestSite.Cert.pem";
 
 export class TestSiteHandler {
-  private testSiteServer: http.Server;
+  private testSiteServer: spdy.Server;
   private sqrlPassportStrategy: SQRLStrategy;
   private sqrlApiHandler: SQRLExpress;
   private userTable: neDB;

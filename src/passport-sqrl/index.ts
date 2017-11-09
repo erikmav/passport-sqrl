@@ -9,13 +9,10 @@ import { SqrlBodyParser } from './SqrlBodyParser';
 import { SqrlUrlFactory } from './SqrlUrlFactory';
 
 // TODO: Unit test for getting error on incorrect version number
-// TODO: Store URLs returned to clients  - or hashes of same - with policies like 12-hour timeouts. Check for valid URLs/hashes on client requests beyond 'query'.
-// TODO: Store nuts returned to clients.
-// TODO: Add nutCheckCallback: Promise<boolean> with backing in cache-like storage
 // TODO: Add urlCheckCallback: Promise<boolean> with backing in cache-like storage
 // TODO: Do we allow multiple query calls on URLs? Multiple calls to any URL?
 // TODO: Unit test for incorrect client URL - attack by client making things up
-// TODO: Unit tests for mising client fields - bad client or attack
+// TODO: Unit tests for missing client fields - bad client or attack
 // TODO: Support default implementation of encrypted nut and support TIFFlags.IPAddressesMatch
 
 /** Definitions for the Transaction Information Flag values specified in the SQRL specification. */

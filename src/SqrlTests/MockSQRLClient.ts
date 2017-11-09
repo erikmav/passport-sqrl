@@ -10,7 +10,7 @@ import { ClientRequestInfo, TIFFlags } from '../passport-sqrl';
 import { SqrlBodyParser } from '../passport-sqrl/SqrlBodyParser';
 
 const serverTlsCertDir = __dirname;
-const serverTlsCert = serverTlsCertDir + "/SQRLTestSite.FullChain.pem";
+const serverTlsCaChain = serverTlsCertDir + "/TestSite.FullChain.Cert.pem";
 
 /**
  * Implements the logic for a minimal SQRL client, used for generating mock call data for unit tests
@@ -76,9 +76,9 @@ export class MockSQRLClient {
       this.previousIdentityPrivateKeys.push(keyPair.privateKey);
     }
 
-    // Set up TLS acceptance list for the self-signed cert on the test site.
+    // Set up TLS acceptance list for the cert chain on the test site.
     // http://www.benjiegillam.com/2012/06/node-dot-js-ssl-certificate-chain/
-    let testSiteCertChain = fs.readFileSync(serverTlsCert);
+    let testSiteCertChain = fs.readFileSync(serverTlsCaChain);
     this.certValidationList = [ testSiteCertChain ];
   }
 

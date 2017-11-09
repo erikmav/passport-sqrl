@@ -15,7 +15,7 @@ import * as testSite from '../testSite/TestSiteHandler';
 
 const testSitePort = 14001;
 const serverTlsCertDir = __dirname;
-const serverTlsCert = serverTlsCertDir + "/SQRLTestSite.FullChain.pem";
+const serverTlsCert = serverTlsCertDir + "/TestSite.FullChain.Cert.pem";
 
 class MockLogger implements ILogger {
   public logLevel: LogLevel;

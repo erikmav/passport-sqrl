@@ -113,14 +113,14 @@ gulp.task('transpile-typescript', [], () => {
 
 gulp.task('copy-sqrl-tests-static-files', [], () => {
   return gulp.src([
-      Paths.Certs + '/SQRLTestSite.FullChain.pem'  // Test site self-signed cert
+      Paths.Certs + '/TestSite.FullChain.Cert.pem'  // Test site cert chain
     ])
     .pipe(gulp.dest(Paths.PassportSqrlTestsOutput));
 });
 
 gulp.task('copy-sqrl-integration-tests-static-files', [], () => {
   return gulp.src([
-      Paths.Certs + '/SQRLTestSite.FullChain.pem'  // Test site self-signed cert
+      Paths.Certs + '/TestSite.FullChain.Cert.pem'  // Test site cert chain
     ])
     .pipe(gulp.dest(Paths.IntegrationTestsOutput));
 });
@@ -144,7 +144,7 @@ gulp.task('copy-test-site-static-files', [], () => {
       Paths.TestSiteRoot + '/**/*.html',
       Paths.TestSiteRoot + '/**/*.css',
       Paths.TestSiteRoot + '/**/*.ejs',
-      Paths.Certs + '/*.pem'  // Test site self-signed cert
+      Paths.Certs + '/*.pem'  // Test site cert chain
     ])
     .pipe(gulp.dest(Paths.TestSiteOutput));
 });
