@@ -1,5 +1,10 @@
 @rem Regenerates the full cert chain for use with localhost testing
 
+@rem https://stackoverflow.com/questions/94445/using-openssl-what-does-unable-to-write-random-state-mean
+@rem https://stackoverflow.com/questions/4051883/batch-script-how-to-check-for-admin-rights#11995662
+@NET SESSION >nul 2>&1
+@IF %ERRORLEVEL% NEQ 0 echo ERROR: You must run in cmd.exe running as administrator && exit /B 0
+
 call CreateRoot.cmd "SQRL Test Root"
 if ERRORLEVEL 1 echo Creating root failed with errorlevel %ERRORLEVEL% && exit /b 1
 

@@ -6,7 +6,7 @@
 @rem
 @rem Usage: CreateLeaf "Subject String" "IntermediateBaseFilename" "BaseFilename"
 @rem E.g.: CreateLeaf "localhost" TestSiteIntermediate TestSite
-#rem Expects IntermediateBaseFilename.PrivateKey.pem and IntermediateBaseFilename.Cert.pem generated
+@rem Expects IntermediateBaseFilename.PrivateKey.pem and IntermediateBaseFilename.Cert.pem generated
 @rem by CreateIntermediate.cmd to be in the current directory.
 @rem
 @rem Derived from https://stackoverflow.com/questions/19665863/how-do-i-use-a-self-signed-certificate-for-a-https-node-js-server#24749608 and
@@ -14,6 +14,11 @@
 @rem
 @rem Assumes OpenSSL-Win64 is installed from https://slproweb.com/products/Win32OpenSSL.html
 @rem The "light" version is sufficient. Install binaries into the bin\ directory, not System32.
+
+@rem https://stackoverflow.com/questions/94445/using-openssl-what-does-unable-to-write-random-state-mean
+@rem https://stackoverflow.com/questions/4051883/batch-script-how-to-check-for-admin-rights#11995662
+@NET SESSION >nul 2>&1
+@IF %ERRORLEVEL% NEQ 0 echo ERROR: You must run in cmd.exe running as administrator && exit /B 0
 
 setlocal ENABLEDELAYEDEXPANSION
 
@@ -24,6 +29,7 @@ if "%INT_FILENAME_BASE%"=="" set INT_FILENAME_BASE=Intermediate
 set FILENAME_BASE=%~3
 if "FILENAME_BASE%"=="" set FILENAME_BASE=Leaf
 
+set ROOT_CERT=RootCert.Cert.pem
 set INT_PRIV=%INT_FILENAME_BASE%.PrivateKey.pem
 set INT_CERT=%INT_FILENAME_BASE%.Cert.pem
 set LEAF_PRIV=%FILENAME_BASE%.PrivateKey.pem
@@ -36,9 +42,16 @@ if ERRORLEVEL 1 echo genrsa failed with errorlevel %ERRORLEVEL% && exit /b 1
 %OPENSSL_PATH% req -new -key %LEAF_PRIV% -out %FILENAME_BASE%.csr.pem -subj "%SUBJECT%" -config CertRequestTemplate.cnf
 if ERRORLEVEL 1 echo Creation of Cert Signing Request failed with errorlevel %ERRORLEVEL% && exit /b 1
 
-%OPENSSL_PATH% x509 -req -in %FILENAME_BASE%.csr.pem -CA %INT_CERT% -CAkey %INT_PRIV% -CAcreateserial -out %LEAF_CERT% -days 3650
-if ERRORLEVEL 1 echo Creation of leaf public cert failed with errorlevel %ERRORLEVEL% && exit /b 1
+@rem Use the intermediate cert and CA database to sign the leaf
+echo.
+%OPENSSL_PATH% ca -verbose -config CertRequestTemplate.cnf -name intermediate_ca -extensions v3_leaf_policy -in %FILENAME_BASE%.csr.pem -cert %INT_CERT% -keyfile %INT_PRIV% -out %LEAF_CERT% -outdir . -days 3650 -batch
+if ERRORLEVEL 1 echo Signing of leaf public cert with intermediate certificate authority cert and key failed with errorlevel %ERRORLEVEL% && exit /b 1
+
 del %FILENAME_BASE%.csr.pem
+
+@rem Verify our result by ensuring the leaf chains to intermediate and root.
+%OPENSSL_PATH% verify -verbose -CAfile %ROOT_CERT% -untrusted %INT_CERT% %LEAF_CERT%
+if ERRORLEVEL 1 echo Validation of leaf cert failed with errorlevel %ERRORLEVEL% && exit /b 1
 
 echo Wrote private key into %LEAF_PRIV% and cert into %LEAF_CERT%
 

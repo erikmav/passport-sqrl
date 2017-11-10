@@ -13,6 +13,11 @@
 @rem Assumes OpenSSL-Win64 is installed from https://slproweb.com/products/Win32OpenSSL.html
 @rem The "light" version is sufficient. Install binaries into the bin\ directory, not System32.
 
+@rem https://stackoverflow.com/questions/94445/using-openssl-what-does-unable-to-write-random-state-mean
+@rem https://stackoverflow.com/questions/4051883/batch-script-how-to-check-for-admin-rights#11995662
+@NET SESSION >nul 2>&1
+@IF %ERRORLEVEL% NEQ 0 echo ERROR: You must run in cmd.exe running as administrator && exit /B 0
+
 setlocal ENABLEDELAYEDEXPANSION
 
 set OPENSSL_PATH=c:\OpenSSL-Win64\bin\openssl.exe
@@ -26,6 +31,9 @@ if ERRORLEVEL 1 echo genrsa failed with errorlevel %ERRORLEVEL% && exit /b 1
 
 %OPENSSL_PATH% req -x509 -new -nodes -key %ROOT_PRIV% -days 10000 -out %ROOT_CERT% -subj "%SUBJECT%" -config CertRequestTemplate.cnf -extensions v3_root_ca_policy
 if ERRORLEVEL 1 echo Creation of root public cert failed with errorlevel %ERRORLEVEL% && exit /b 1
+
+%OPENSSL_PATH% x509 -noout -text -in %ROOT_CERT%
+if ERRORLEVEL 1 echo Validation of root public cert failed with errorlevel %ERRORLEVEL% && exit /b 1
 
 echo Wrote private key into %ROOT_PRIV% and cert into %ROOT_CERT%
 
