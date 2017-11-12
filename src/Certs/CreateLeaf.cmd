@@ -43,7 +43,8 @@ if ERRORLEVEL 1 echo genrsa failed with errorlevel %ERRORLEVEL% && exit /b 1
 if ERRORLEVEL 1 echo Creation of Cert Signing Request failed with errorlevel %ERRORLEVEL% && exit /b 1
 
 @rem Use the intermediate cert and CA database to sign the leaf
-echo.
+@rem http://certificate.fyicenter.com/2115_OpenSSL_ca_Command_Options.html
+@echo.
 %OPENSSL_PATH% ca -verbose -config CertRequestTemplate.cnf -name intermediate_ca -extensions v3_leaf_policy -in %FILENAME_BASE%.csr.pem -cert %INT_CERT% -keyfile %INT_PRIV% -out %LEAF_CERT% -outdir . -days 3650 -batch
 if ERRORLEVEL 1 echo Signing of leaf public cert with intermediate certificate authority cert and key failed with errorlevel %ERRORLEVEL% && exit /b 1
 

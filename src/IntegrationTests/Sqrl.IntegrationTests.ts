@@ -8,9 +8,8 @@ import * as http from "http";
 import * as request from 'request';
 import * as requestPromise from 'request-promise-native';
 import * as rimraf from 'rimraf';
-import { TIFFlags } from '../passport-sqrl';
+import { ILogger, LogLevel, TIFFlags } from '../passport-sqrl';
 import { MockSQRLClient, ServerResponseInfo } from '../SqrlTests/MockSQRLClient';
-import { ILogger, LogLevel } from '../testSite/Logging';
 import * as testSite from '../testSite/TestSiteHandler';
 
 const testSitePort = 14001;
@@ -32,8 +31,8 @@ class MockLogger implements ILogger {
   public debug(message: string): void {
     console.log(message);
   }
-  public finest(message: string): void {
-    console.log(message);
+  public finest(messageGenerator: () => string): void {
+    console.log(messageGenerator());
   }
 }
 
@@ -80,7 +79,7 @@ describe('SqrlTestSite_Integration', () => {
       assert.equal(0, queryResponse.tifValues, "Expected no ID match to current server");
       console.log(`Next nut=${queryResponse.nextNut}`);
       console.log(`Next url=${queryResponse.nextRequestPathAndQuery}`);
-      assert.equal(queryResponse.nextRequestPathAndQuery, '/sqrl');
+      assert.isTrue(queryResponse.nextRequestPathAndQuery.startsWith('/sqrl?nut='));
 
       site.close();
     });

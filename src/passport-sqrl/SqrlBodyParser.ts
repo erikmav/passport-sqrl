@@ -88,7 +88,7 @@ export class SqrlBodyParser {
             requestInfo.returnSessionUnlockKey = true;
             break;
           default:
-            // TODO: Unknown. Log? Throw?
+            throw new Error(`Unknown SQRL client option ${opt}`);
         }
       });
     }

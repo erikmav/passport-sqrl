@@ -2,67 +2,80 @@
 // specific component implementations to match local requirements.
 
 import * as bunyan from 'bunyan';
-
-// When the log level is less than or equal to the level of a specific log trace
-// it is emitted to the log destination.
-export enum LogLevel { Error, Warning, Info, Debug, Finest }
-
-export interface ILogger {
-  // Gets or sets the current log level.
-  logLevel: LogLevel;
-  
-  error(message: string): void;
-  warning(message: string): void;
-  info(message: string): void;
-  debug(message: string): void;
-  finest(message: string): void;
-}
+import { ILogger, LogLevel } from '../passport-sqrl';
 
 export class BunyanLogger implements ILogger {
   public bunyanLogger: bunyan;
-  public logLevel: LogLevel;
 
-  constructor(name: string) {
+  public get logLevel() { return this.logLevelBacking; }
+  public set logLevel(lev: LogLevel) {
+    let bunyanLevel: number;
+    switch (lev) {
+      case LogLevel.Error:
+        bunyanLevel = bunyan.ERROR;
+        break;
+      case LogLevel.Warning:
+        bunyanLevel = bunyan.WARN;
+        break;
+      case LogLevel.Info:
+        bunyanLevel = bunyan.INFO;
+        break;
+      case LogLevel.Debug:
+        bunyanLevel = bunyan.DEBUG;
+        break;
+      case LogLevel.Finest:
+        bunyanLevel = bunyan.TRACE;
+        break;
+      default:
+        throw new Error(`Unknown LogLevel ${lev}`);
+    }
+    this.bunyanLogger.level(bunyanLevel);
+    this.logLevelBacking = lev;
+  }
+
+  private logLevelBacking: LogLevel;
+  
+  constructor(name: string, logLevel: LogLevel = LogLevel.Debug) {
     this.bunyanLogger = bunyan.createLogger({
       name: name,
       streams: [
         {
           stream: process.stderr,
-          level: "debug"
+          level: bunyan.TRACE
         }
       ]
     });
 
-    this.logLevel = LogLevel.Debug;
+    this.logLevel = logLevel;
   }
   
   public error(message: string) {
-    if (this.logLevel <= LogLevel.Error) {
+    if (this.logLevel >= LogLevel.Error) {
       this.bunyanLogger.error(message);
     }
   }
 
   public warning(message: string) {
-    if (this.logLevel <= LogLevel.Warning) {
+    if (this.logLevel >= LogLevel.Warning) {
       this.bunyanLogger.warn(message);
     }
   }
   
   public info(message: string) {
-    if (this.logLevel <= LogLevel.Info) {
+    if (this.logLevel >= LogLevel.Info) {
       this.bunyanLogger.info(message);
     }
   }
   
   public debug(message: string) {
-    if (this.logLevel <= LogLevel.Debug) {
+    if (this.logLevel >= LogLevel.Debug) {
       this.bunyanLogger.debug(message);
     }
   }
   
-  public finest(message: string) {
-    if (this.logLevel <= LogLevel.Finest) {
-      this.bunyanLogger.trace(message);
+  public finest(messageGenerator: () => string) {
+    if (this.logLevel >= LogLevel.Finest) {
+      this.bunyanLogger.trace(messageGenerator());
     }
   }
 }

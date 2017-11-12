@@ -28,8 +28,7 @@ import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
 import * as spdy from 'spdy';
 import { promisify } from 'util';
-import { AuthCompletionInfo, ClientRequestInfo, SQRLExpress, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
-import { ILogger } from './Logging';
+import { AuthCompletionInfo, ClientRequestInfo, ILogger, ISQRLIdentityStorage, SQRLExpress, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
 
 // TypeScript definitions for SPDY do not include an overload that allows the common
 // Express app pattern as a param. Inject an overload to avoid compilation errors.
@@ -55,7 +54,7 @@ const serverTlsCertDir = __dirname;
 const serverTlsKey = serverTlsCertDir + "/TestSite.PrivateKey.pem";
 const serverTlsCert = serverTlsCertDir + "/TestSite.Cert.pem";
 
-export class TestSiteHandler {
+export class TestSiteHandler implements ISQRLIdentityStorage {
   private testSiteServer: spdy.Server;
   private sqrlPassportStrategy: SQRLStrategy;
   private sqrlApiHandler: SQRLExpress;
@@ -81,12 +80,7 @@ export class TestSiteHandler {
       urlPath: sqrlApiRoute,
     };
 
-    this.sqrlApiHandler = new SQRLExpress(sqrlConfig,
-      (clientRequestInfo: ClientRequestInfo) => this.query(clientRequestInfo),
-      (clientRequestInfo: ClientRequestInfo) => this.ident(clientRequestInfo),
-      (clientRequestInfo: ClientRequestInfo) => this.disable(clientRequestInfo),
-      (clientRequestInfo: ClientRequestInfo) => this.enable(clientRequestInfo),
-      (clientRequestInfo: ClientRequestInfo) => this.remove(clientRequestInfo));
+    this.sqrlApiHandler = new SQRLExpress(this, this.log, sqrlConfig);
 
     this.sqrlPassportStrategy = new SQRLStrategy(sqrlConfig,
       (clientRequestInfo: ClientRequestInfo) => this.query(clientRequestInfo),
@@ -117,7 +111,7 @@ export class TestSiteHandler {
       .get(loginPageRoute, (req, res) => {
         this.log.debug('/login requested');
         let urlAndNut: SQRLUrlAndNut = this.sqrlPassportStrategy.getSqrlUrl(req);
-        this.nutIssuedToLoginPageAsync(urlAndNut)
+        this.nutIssuedToClientAsync(urlAndNut)
           .then(() => {
             let qrSvg = qr.imageSync(urlAndNut.url, { type: 'svg', parse_url: true });
             res.render('login', {
@@ -135,10 +129,7 @@ export class TestSiteHandler {
       .post(sqrlLoginRoute, passport.authenticate('sqrl'))
 
       // TODO: Keep? Refactor?
-      .post(sqrlApiRoute, (req, res, next) => {
-        this.log.debug(`/sqrl request: ${req.body}`);
-        this.sqrlApiHandler.HandleSqrlApi(req, res);
-      })
+      .post(sqrlApiRoute, this.sqrlApiHandler.handleSqrlApi)
       
       // Used by login.ejs
       .get(pollNutRoute, (req, res) => {
@@ -245,16 +236,11 @@ export class TestSiteHandler {
    *    was logged in. In that case we log the browser on and return the usual
    *    ambient user profile reference in the cookie.
    */
-  private async nutIssuedToLoginPageAsync(sqrlUrlAndNut: SQRLUrlAndNut): Promise<void> {
+  public async nutIssuedToClientAsync(sqrlUrlAndNut: SQRLUrlAndNut): Promise<void> {
     return (<any> this.nutTable).insertAsync(new NutDBRecord(sqrlUrlAndNut.nutString, sqrlUrlAndNut.url));
   }
 
-  /** Returns null if not found. */
-  private async pollNutAsync(nut: string): Promise<NutDBRecord | null> {
-    return (<any> this.nutTable).findOneAsync(<NutDBRecord> { nut: nut });
-  }
-
-  private async query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public async query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL query. We don't create any new user records, just return whether we know about the user.
     let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
     if (authInfo.user && clientRequestInfo.returnSessionUnlockKey) {
@@ -264,7 +250,7 @@ export class TestSiteHandler {
     return authInfo;
   }
 
-  private async ident(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public async ident(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL login request.
     let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
     if (authInfo.user) {
@@ -293,19 +279,24 @@ export class TestSiteHandler {
     return authInfo;
   }
 
-  private disable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public disable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL identity disable request.
     return Promise.resolve(new AuthCompletionInfo());  // TODO
   }
 
-  private enable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public enable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL identity enable request.
     return Promise.resolve(new AuthCompletionInfo());  // TODO
   }
 
-  private remove(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public remove(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL identity remove request.
     return Promise.resolve(new AuthCompletionInfo());  // TODO
+  }
+
+  /** Returns null if not found. */
+  private async pollNutAsync(nut: string): Promise<NutDBRecord | null> {
+    return (<any> this.nutTable).findOneAsync(<NutDBRecord> { nut: nut });
   }
 
   private findUser(sqrlPublicKey: string, done: (err: Error, doc: any) => void): void {

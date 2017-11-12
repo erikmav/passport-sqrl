@@ -87,6 +87,59 @@ export class AuthCompletionInfo {
 export type AuthCallback = (clientRequestInfo: ClientRequestInfo) => Promise<AuthCompletionInfo>;
 
 /**
+ * Log levels for ILogger.
+ */
+export enum LogLevel { Error, Warning, Info, Debug, Finest }
+
+/**
+ * A simple logging interface accepted by the SQRL Strategy.
+ * Callers can choose the adapt this call interface to Bunyan or any other logger.
+ */
+export interface ILogger {
+  /**
+   * Gets or sets the current log level.
+   * When the configured log level is greater than or equal to the level of a specific log trace
+   * it is emitted to the log destination.
+   */
+  logLevel: LogLevel;
+  
+  error(message: string): void;
+  warning(message: string): void;
+  info(message: string): void;
+  debug(message: string): void;
+
+  /** Finest logging is almost always off in production; use generator to avoid excessive GC. */
+  finest(messageGenerator: () => string): void;
+}
+
+/**
+ * The behavior that must be implemented by the next-higher layer that provides
+ * authentication storage.
+ */
+export interface ISQRLIdentityStorage {
+  /**
+   * Stores a nut and an optional related URL issued to a client.
+   * This is used to later look up the nut when provided in a later client call.
+   */
+  nutIssuedToClientAsync(urlAndNut: SQRLUrlAndNut): Promise<void>;
+
+  /** Called by the SQRL strategy on a SQRL client call to verify access. */
+  query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+
+  /** Called by the SQRL strategy on a SQRL client call to log in. */
+  ident(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+
+  /** Called by the SQRL strategy on a SQRL client call to disable a SQRL identity. */
+  disable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+
+  /** Called by the SQRL strategy on a SQRL client call to enable a SQRL identity. */
+  enable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+
+  /** Called by the SQRL strategy on a SQRL client call to remove a SQRL identity. */
+  remove(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+}
+
+/**
  * ExpressJS middleware for the SQRL API.
  * This handler is intended to be attached to a SQRL-specific route, e.g. '/sqrl',
  * that is not hooked into PassportJS.
@@ -97,32 +150,29 @@ export type AuthCallback = (clientRequestInfo: ClientRequestInfo) => Promise<Aut
  * 
  */
 export class SQRLExpress {
+  private identityStorage: ISQRLIdentityStorage;
+  private log: ILogger;
   private config: SQRLStrategyConfig;
-  private queryCallback: AuthCallback;
-  private identCallback: AuthCallback;
-  private disableCallback: AuthCallback;
-  private enableCallback: AuthCallback;
-  private removeCallback: AuthCallback;
   private urlFactory: SqrlUrlFactory;
   private nutGenerator: (req: express.Request) => string | Buffer;
 
   /**
    * Creates a new SQRL passport strategy instance.
-   * @param authCallback Called by the SQRL strategy to verify access for the provided client key and other information.
+   * @param identityStorage: Provides an identity storage implementation for calls from the SQRL layer.
+   * @param log ILogger implementation for logging output. Allowed to be undefined/null.
+   *   Errors are used for true errors in execution. Warnings are used for recoverable
+   *   issues, e.g. errors caused by data from the network. Debug is for moderate
+   *   frequency operational output. Finest is used for intensive traffic logging and
+   *   detailed flow output.
+   * @param config Configuration settings for this instance.
    */
   constructor(
-      config: SQRLStrategyConfig,
-      query: AuthCallback,
-      ident: AuthCallback,
-      disable: AuthCallback,
-      enable: AuthCallback,
-      remove: AuthCallback) {
+      identityStorage: ISQRLIdentityStorage,
+      log: ILogger,
+      config: SQRLStrategyConfig) {
+    this.identityStorage = identityStorage;
+    this.log = log;
     this.config = config;
-    this.queryCallback = query;
-    this.identCallback = ident;
-    this.disableCallback = disable;
-    this.enableCallback = enable;
-    this.removeCallback = remove;
 
     this.urlFactory = new SqrlUrlFactory(
         config.localDomainName,
@@ -155,12 +205,16 @@ export class SQRLExpress {
    * The Express middleware handler. Use like:
    * 
    * let sqrlApi = new SQRLExpress(...);
-   * app.post('/sqrl', sqrlApi.HandleSqrlApi);
+   * app.post('/sqrl', sqrlApi.handleSqrlApi);
    */
-  public HandleSqrlApi = (req: express.Request, res: express.Response) => {
+  public handleSqrlApi = (req: express.Request, res: express.Response) => {
     // Promisify to allow async coding style in authenticateAync and in unit tests.
     this.authenticateAsync(req)
-      .then(authResult => {
+      .then((authResult: AuthenticateAsyncResult) => {
+        this.log.debug('SQRL API call complete: ' +
+          `callFail:${authResult.callFail}; ` +
+          `httpResponseCode: ${authResult.httpResponseCode}; ` +
+          `user: ${authResult.user ? authResult.user.toString() : ""}`);
         res.write(authResult.body);
         res.statusCode = authResult.httpResponseCode;
         
@@ -174,21 +228,22 @@ export class SQRLExpress {
         res.end();
       })
       .catch(err => {
+        this.log.error(`Error thrown from SQRL API call: ${err}`);
         // TODO: Can we differentiate transient versus nontransient errors?
-        /* tslint:disable:no-bitwise */
+        // tslint:disable-next-line:no-bitwise
         let tif: TIFFlags = TIFFlags.CommandFailed | TIFFlags.TransientError;
-        /* tslint:enable:no-bitwise */
 
         // Per SQRL protocol, the name-value pairs below will be joined in the same order
         // with CR and LF characters, then base64url encoded.
+        let nextNut = SqrlUrlFactory.nutToString(this.nutGenerator(req));
         let serverLines: string[] = [
           'ver=1',  // Suported versions list
-          'nut=' + SqrlUrlFactory.nutToString(this.nutGenerator(req)),  // TODO: Register this with upper handler
+          'nut=' + nextNut,  // TODO: Register this with upper handler
           'tif=' + tif.toString(16),
-          'qry=' + this.config.urlPath,
+          'qry=' + this.config.urlPath + '?nut=' + nextNut,
 
           // Use "ask" dialog on client to show error.
-          'ask=' + "Server error: " + err.toString(),
+          'ask=' + "Server error: " + err ? err.toString() : "<none>",
         ];
         let resp = serverLines.join("\r\n") + "\r\n";  // Last line must have CRLF as well.
         resp = base64url.encode(resp);
@@ -215,33 +270,38 @@ export class SQRLExpress {
       throw new Error(`This server only handles SQRL protocol revision 1`);
     }
 
+    this.log.debug(
+        `SQRL API call received to ${this.config.urlPath}: ` +
+        `HTTP method ${req.method}. Parameter fields:${this.objToString(params)} . ` +
+        'Decoded:' + this.objToString(clientRequestInfo));
+
     // Fill in the nut and next URL before the callback to let them be stored during the call.
     clientRequestInfo.nextNut = SqrlUrlFactory.nutToString(this.nutGenerator(req));
 
-    let callback: AuthCallback;
+    // The awaits here will throw any exceptions outward to the
+    // authenticate() callback handler.
+    let authCompletion: AuthCompletionInfo;
     switch (clientRequestInfo.sqrlCommand) {
       case 'query':
-        callback = this.queryCallback;
+        authCompletion = await this.identityStorage.query(clientRequestInfo);
         break;
       case 'ident':
-        callback = this.identCallback;
+        authCompletion = await this.identityStorage.ident(clientRequestInfo);
         break;
       case 'disable':
-        callback = this.disableCallback;
+        authCompletion = await this.identityStorage.disable(clientRequestInfo);
         break;
       case 'enable':
-        callback = this.enableCallback;
+        authCompletion = await this.identityStorage.enable(clientRequestInfo);
         break;
       case 'remove':
-        callback = this.removeCallback;
+        authCompletion = await this.identityStorage.remove(clientRequestInfo);
         break;
       default:
         throw new Error(`Unknown SQRL command ${clientRequestInfo.sqrlCommand}`);
     }
 
-    // The await here will throw any exceptions outward to the
-    // authenticate() callback handler.
-    let authCompletion: AuthCompletionInfo = await callback(clientRequestInfo);
+    this.log.debug(`Auth completion info: ${this.objToString(authCompletion)}`);
     return <AuthenticateAsyncResult> {
       user: authCompletion.user,
       body: this.authCompletionToResponseBody(clientRequestInfo, authCompletion),
@@ -269,7 +329,7 @@ export class SQRLExpress {
       'ver=1',  // Suported versions list
       'nut=' + clientRequestInfo.nextNut,
       'tif=' + (authInfo.tifValues || 0).toString(16),
-      'qry=' + this.config.urlPath,
+      'qry=' + this.config.urlPath + '?nut=' + clientRequestInfo.nextNut,
     ];
 
     if (clientRequestInfo.clientProvidedSession && clientRequestInfo.sqrlCommand !== 'query') {
@@ -285,6 +345,14 @@ export class SQRLExpress {
     let resp = serverLines.join("\r\n") + "\r\n";  // Last line must have CRLF as well.
     resp = base64url.encode(resp);
     return resp;
+  }
+
+  private objToString(o: any): string {
+    let values = "";
+    for (let propName in o) {
+      values += ` ${propName}=${o[propName]}`;
+    }
+    return values;
   }
 }
 

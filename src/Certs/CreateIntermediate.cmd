@@ -32,7 +32,7 @@ set INT_PRIV=%FILENAME_BASE%.PrivateKey.pem
 set INT_CERT=%FILENAME_BASE%.Cert.pem
 
 @rem Mid key length for intermediate key to last longer against brute force or quantum attack.
-echo.
+@echo.
 %OPENSSL_PATH% genrsa -out %INT_PRIV% 3072
 if ERRORLEVEL 1 echo genrsa failed with errorlevel %ERRORLEVEL% && exit /b 1
 
@@ -40,12 +40,13 @@ if ERRORLEVEL 1 echo genrsa failed with errorlevel %ERRORLEVEL% && exit /b 1
 if ERRORLEVEL 1 echo Creation of Cert Signing Request failed with errorlevel %ERRORLEVEL% && exit /b 1
 
 @rem Use the root cert and CA database to sign the intermediate
-echo.
+@rem http://certificate.fyicenter.com/2115_OpenSSL_ca_Command_Options.html
+@echo.
 %OPENSSL_PATH% ca -verbose -config CertRequestTemplate.cnf -extensions v3_intermediate_ca_policy -in %FILENAME_BASE%.csr.pem -cert %ROOT_CERT% -keyfile %ROOT_PRIV% -out %INT_CERT% -outdir . -days 3650 -batch
 if ERRORLEVEL 1 echo Signing of intermediate public cert with root certificate authority cert and key failed with errorlevel %ERRORLEVEL% && exit /b 1
 
 @rem Verify our result by ensuring the intermediate chains to the root.
-echo.
+@echo.
 %OPENSSL_PATH% verify -verbose -CAfile %ROOT_CERT% %INT_CERT%
 if ERRORLEVEL 1 echo Validation of intermediate cert failed with errorlevel %ERRORLEVEL% && exit /b 1
 
