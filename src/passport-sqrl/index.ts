@@ -114,7 +114,7 @@ export interface ILogger {
 
 /**
  * The behavior that must be implemented by the next-higher layer that provides
- * authentication storage.
+ * identity storage.
  */
 export interface ISQRLIdentityStorage {
   /**
@@ -214,8 +214,8 @@ export class SQRLExpress {
         this.log.debug('SQRL API call complete: ' +
           `callFail:${authResult.callFail}; ` +
           `httpResponseCode: ${authResult.httpResponseCode}; ` +
-          `user: ${authResult.user ? authResult.user.toString() : ""}`);
-        res.write(authResult.body);
+          `user: ${this.objToString(authResult.user)}; ` +
+          `encoded body: ${authResult.body}`);
         res.statusCode = authResult.httpResponseCode;
         
         // TODO - can we wire this into Passport somehow?
@@ -225,7 +225,7 @@ export class SQRLExpress {
           // and so on?
         }
 
-        res.end();
+        res.send(authResult.body);
       })
       .catch(err => {
         this.log.error(`Error thrown from SQRL API call: ${err}`);
@@ -249,7 +249,7 @@ export class SQRLExpress {
         resp = base64url.encode(resp);
 
         res.statusCode = 500;
-        res.end(resp);
+        res.send(resp);
       });
   }
 
@@ -269,14 +269,18 @@ export class SQRLExpress {
     if (clientRequestInfo.protocolVersion !== 1) {
       throw new Error(`This server only handles SQRL protocol revision 1`);
     }
+    let nextNut: string | Buffer = this.nutGenerator(req);
+    let nextNutStr = SqrlUrlFactory.nutToString(nextNut);
+    let nextUrl = this.config.urlPath + '?nut=' + nextNutStr;
+    let urlAndNut = new SQRLUrlAndNut(nextUrl, nextNut, nextNutStr);
+    await this.identityStorage.nutIssuedToClientAsync(urlAndNut);
+    clientRequestInfo.nextNut = nextNutStr;
+    clientRequestInfo.nextUrl = nextUrl;
 
     this.log.debug(
         `SQRL API call received to ${this.config.urlPath}: ` +
         `HTTP method ${req.method}. Parameter fields:${this.objToString(params)} . ` +
         'Decoded:' + this.objToString(clientRequestInfo));
-
-    // Fill in the nut and next URL before the callback to let them be stored during the call.
-    clientRequestInfo.nextNut = SqrlUrlFactory.nutToString(this.nutGenerator(req));
 
     // The awaits here will throw any exceptions outward to the
     // authenticate() callback handler.
@@ -306,9 +310,10 @@ export class SQRLExpress {
       user: authCompletion.user,
       body: this.authCompletionToResponseBody(clientRequestInfo, authCompletion),
 
-      // Per the SQRL API for calls like query we must return a 200 even though
+      // Per the SQRL API for calls like query we must return a 200 even if
       // there is no login performed, as this is really an API endpoint with multiple
-      // round-trips.
+      // round-trips, and most of the error information is contained within the
+      // SQRL response fields (e.g. TIF).
       httpResponseCode: 200,
 
       // Only for the ident API call do we return a success call to Passport,
@@ -343,11 +348,15 @@ export class SQRLExpress {
     }
 
     let resp = serverLines.join("\r\n") + "\r\n";  // Last line must have CRLF as well.
+    this.log.debug(`Response body pre-encoding: ${resp}`);
     resp = base64url.encode(resp);
     return resp;
   }
 
   private objToString(o: any): string {
+    if (!o) {
+      return "undefined";
+    }
     let values = "";
     for (let propName in o) {
       values += ` ${propName}=${o[propName]}`;
@@ -534,17 +543,13 @@ export class SQRLStrategy extends Strategy {
  */
 export class AuthenticateAsyncResult {
   /**
-   * When user is present, this is optional additional user information, e.g. a profile.
-   * When user and err are undefined this should be set to provide information to
-   * return to the client in a 401 challenge response; it can be either a string or an object
-   * having 'message' and 'type' fields.
-   *
-   * This field is not expected to be non-null for a SQRL 'query' command.
+   * The user profile for return to PassportJS.
+   * This field is expected to be null for a SQRL 'query' command.
    */
   public user?: any;
 
-  /** Response body additional information. */
-  public body?: any;
+  /** base64url encoded response fields for return in the API response body. */
+  public body?: string;
 
   public httpResponseCode: number;
 
@@ -693,6 +698,9 @@ export class ClientRequestInfo {
    * cache to allow responding to NutCheckCallback calls.
    */
   public nextNut: string;
+
+  /** The relative URL to be passed back for the next communication from the client. */
+  public nextUrl: string;
 
   /** Provides a Buffer version of primaryIdentityPublicKey. */
   public primaryIdentityPublicKeyBuf(): Buffer {

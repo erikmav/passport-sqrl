@@ -332,6 +332,9 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
         }
       }
     }
+    // TODO: Convert to recommended algorithm for detection.
+    // tslint:disable-next-line:no-bitwise
+    result.tifValues |= TIFFlags.IPAddressesMatch;
     return result;
   }
 
