@@ -153,7 +153,7 @@ export class MockSQRLClient {
     let clientPreBase64 = clientLines.join('\r\n') + '\r\n';  // SQRL spec requires trailing CRLF
     let client = base64url.encode(clientPreBase64);
     let server = base64url.encode(this.originalSqrlUrl);  // TODO: Use previous reply info on 2nd and later round trips
-    let clientServer = new Buffer(client + server, 'utf8');
+    let clientServer = Buffer.from(client + server, 'utf8');
     let clientServerSignature = ed25519.Sign(clientServer, this.primaryIdentityPrivateKey);
 
     let result = <RequestPostBody> {
@@ -350,8 +350,10 @@ describe('SQRLClient', () => {
       mockClient.clientProvidedSession = true;
       mockClient.returnSessionUnlockKey = true;
       let bodyFields: any = mockClient.generatePostBody('query');
+      assert.isFalse(!bodyFields.client);
+      assert.isFalse(!bodyFields.server);
 
-      let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseBodyFields(bodyFields);
+      let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseAndValidateRequestFields(bodyFields);
 
       assert.equal('query', clientRequestInfo.sqrlCommand);
       // TODO: Check other fields
@@ -359,6 +361,7 @@ describe('SQRLClient', () => {
       assert.isTrue(clientRequestInfo.hardLockSqrlUse);
       assert.isTrue(clientRequestInfo.clientProvidedSession);
       assert.isTrue(clientRequestInfo.returnSessionUnlockKey);
+      assert.equal('1234', clientRequestInfo.nut);
     });
   });
 });

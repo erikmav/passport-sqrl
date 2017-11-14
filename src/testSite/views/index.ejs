@@ -1,4 +1,12 @@
+<script>
+  $(document).ready(() => {
+    $('#current-cookie').text(`Current document.cookie value: ${document.cookie}`);
+  });
+</script>
 <p>
   You are logged in as user <%= username %> with SQRL site-specific
   public key <%= sqrlPublicKey %> .
+</p>
+<p id="current-cookie">
+  (pending cookie value)
 </p>

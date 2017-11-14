@@ -12,7 +12,7 @@ describe('SqrlUrlFactory', () => {
       url = SqrlUrlFactory.create('www.foo.com', "secure2", undefined, '/sqrlLogin');
       assert.equal(url, 'sqrl://www.foo.com/sqrlLogin?nut=secure2');
 
-      url = SqrlUrlFactory.create('www.foo.com', new Buffer("secure3"), undefined, 'sqrlLogin2?');
+      url = SqrlUrlFactory.create('www.foo.com', Buffer.from("secure3"), undefined, 'sqrlLogin2?');
       assert.equal(url, 'sqrl://www.foo.com/sqrlLogin2?nut=c2VjdXJlMw');
 
       url = SqrlUrlFactory.create('www.foo.com', "secure4", undefined, '');
@@ -82,10 +82,10 @@ describe('trimEqualsChars', () => {
 describe('toSqrlBase64', () => {
   describe('toSqrlBase64Cases', () => {
     it('should return the appropriate result = trimmed base64url strings for various inputs to toSqrlBase64', () => {
-      let s = toSqrlBase64(new Buffer([0, 1, 2, 3]));
+      let s = toSqrlBase64(Buffer.from([0, 1, 2, 3]));
       assert.equal(s, 'AAECAw');  // Regular base64 encding is 'AAAECAw=='
 
-      s = toSqrlBase64(new Buffer([0, 1, 2, 3, 4, 5]));
+      s = toSqrlBase64(Buffer.from([0, 1, 2, 3, 4, 5]));
       assert.equal(s, 'AAECAwQF');  // Even multiple of 6 bits for encoding, base64 string same as trimmed result.
     });
   });

@@ -20,13 +20,15 @@
     $.get({
       url: "/pollNut/<%= sqrlNut %>",
       cache: false,
-      error: (jqXHR, textStatus, errorThrown) => $("#login-text").text(`ERROR getting nut status: ${textStatus}: ${errorThrown}`),
+      error: (jqXHR, textStatus, errorThrown) => {
+        $("#login-text").text(`ERROR getting nut status: ${textStatus}: ${errorThrown}`);
+        setTimeout(resetLoginText, nutCheckIntervalMsec / 2);
+      },
       success: (data, textStatus, jqXHR) => {
         // Store the login cookie value and Redirect the page if the nut was logged in.
         // Data is a NutPollResult
         if (data && data.loggedIn) {
-          $("#login-text").text(`Success! Storing cookie value (${result.cookie}) and redirecting in a few seconds`);
-          document.cookie = data.cookie;
+          $("#login-text").text(`Success! Browser stored updated cookie containing session. Redirecting to ${data.redirectTo} in a few seconds`);
           setTimeout(() => window.location.href = data.redirectTo, 4000);
         } else {
           // Normal case: No login.

@@ -118,25 +118,41 @@ export interface ILogger {
  */
 export interface ISQRLIdentityStorage {
   /**
-   * Stores a nut and an optional related URL issued to a client.
-   * This is used to later look up the nut when provided in a later client call.
+   * Stores a nut and an optional related URL issued to a client, along with
+   * an optional reference to a predecessor nut value originally presented in a
+   * QR code to a user.
+   * 
+   * This information is typically used in a site polling query (like the /pollNut route in the
+   * demo site in the passport-sqrl Git repo) waiting for a completed login sequence. Because
+   * the SQRL API typically involves multiple round trips to the server and does not fit within
+   * the single round trip authentication model used by PassportJS, tracking recent nuts and their
+   * lineage back to a QR code is needed to allow mapping of presented nut values to final logins.
+   * 
+   * The implementation should store this information in a rapid, distributed lookup storage system
+   * like a cache layer (e.g. Redis), with a limited time-to-live value (e.g. 12 hours) after which
+   * the nut is forgotten. It should also store any known user profile references along with this
+   * information. For a sample implementation see the NeDB implementation in the demo site
+   * in the pasport-sqrl Git repo.
    */
-  nutIssuedToClientAsync(urlAndNut: SQRLUrlAndNut): Promise<void>;
+  nutIssuedToClientAsync(urlAndNut: SQRLUrlAndNut, originalLoginNut?: string): Promise<void>;
+
+  /** Retrieves stored information about a nut value. */
+  getNutInfoAsync(nut: string): Promise<SQRLNutInfo | null>;
 
   /** Called by the SQRL strategy on a SQRL client call to verify access. */
-  query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+  query(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
 
   /** Called by the SQRL strategy on a SQRL client call to log in. */
-  ident(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+  ident(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
 
   /** Called by the SQRL strategy on a SQRL client call to disable a SQRL identity. */
-  disable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+  disable(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
 
   /** Called by the SQRL strategy on a SQRL client call to enable a SQRL identity. */
-  enable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+  enable(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
 
   /** Called by the SQRL strategy on a SQRL client call to remove a SQRL identity. */
-  remove(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo>;
+  remove(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
 }
 
 /**
@@ -265,15 +281,23 @@ export class SQRLExpress {
       params = req.params;  // Allow GET calls with URL params.
     }
 
-    let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseBodyFields(params);
+    let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseAndValidateRequestFields(params);
     if (clientRequestInfo.protocolVersion !== 1) {
       throw new Error(`This server only handles SQRL protocol revision 1`);
     }
+    let nutInfoPromise: Promise<SQRLNutInfo | null> = this.identityStorage.getNutInfoAsync(clientRequestInfo.nut);
+
     let nextNut: string | Buffer = this.nutGenerator(req);
     let nextNutStr = SqrlUrlFactory.nutToString(nextNut);
     let nextUrl = this.config.urlPath + '?nut=' + nextNutStr;
     let urlAndNut = new SQRLUrlAndNut(nextUrl, nextNut, nextNutStr);
-    await this.identityStorage.nutIssuedToClientAsync(urlAndNut);
+
+    let nutInfo: SQRLNutInfo | null = await nutInfoPromise;
+    if (!nutInfo) {
+      throw new Error('Client presented unknown nut value');
+    }
+
+    await this.identityStorage.nutIssuedToClientAsync(urlAndNut, nutInfo.originalLoginNut || nutInfo.nut);
     clientRequestInfo.nextNut = nextNutStr;
     clientRequestInfo.nextUrl = nextUrl;
 
@@ -287,19 +311,19 @@ export class SQRLExpress {
     let authCompletion: AuthCompletionInfo;
     switch (clientRequestInfo.sqrlCommand) {
       case 'query':
-        authCompletion = await this.identityStorage.query(clientRequestInfo);
+        authCompletion = await this.identityStorage.query(clientRequestInfo, nutInfo);
         break;
       case 'ident':
-        authCompletion = await this.identityStorage.ident(clientRequestInfo);
+        authCompletion = await this.identityStorage.ident(clientRequestInfo, nutInfo);
         break;
       case 'disable':
-        authCompletion = await this.identityStorage.disable(clientRequestInfo);
+        authCompletion = await this.identityStorage.disable(clientRequestInfo, nutInfo);
         break;
       case 'enable':
-        authCompletion = await this.identityStorage.enable(clientRequestInfo);
+        authCompletion = await this.identityStorage.enable(clientRequestInfo, nutInfo);
         break;
       case 'remove':
-        authCompletion = await this.identityStorage.remove(clientRequestInfo);
+        authCompletion = await this.identityStorage.remove(clientRequestInfo, nutInfo);
         break;
       default:
         throw new Error(`Unknown SQRL command ${clientRequestInfo.sqrlCommand}`);
@@ -458,7 +482,7 @@ export class SQRLStrategy extends Strategy {
       params = req.params;  // Allow GET calls with URL params.
     }
 
-    let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseBodyFields(params);
+    let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseAndValidateRequestFields(params);
     if (clientRequestInfo.protocolVersion !== 1) {
       throw new Error(`This server only handles SQRL protocol revision 1`);
     }
@@ -598,7 +622,21 @@ export class ClientRequestInfo {
    *              disabled) from the server's identity store.
    */
   public sqrlCommand: string;
-  
+
+  /**
+   * The nut value presented to the server. This could come from an original
+   * QR code URL on a first SQRL 'query' command, or a follow-up URL handed
+   * back to the client on a query or other response.
+   * 
+   * Typically this value is used (a) as a layer of security to verify that
+   * the client is not just making up random plausible nut values but in fact
+   * is returning a nut generated by this server (or server cluster), and (b)
+   * to provide a chain of nut values leading from a QR code to an eventual
+   * login, for supporting auto-login flows. See doc comments on
+   * ISQRLIdentityStorage nutIssuedToClientAsync() and getNutInfoAsync().
+   */
+  public nut: string;
+
   /**
    * The primary identity public key that the client wishes to use to contact this
    * server in the future. It may not correspond to a public key previously received
@@ -699,7 +737,10 @@ export class ClientRequestInfo {
    */
   public nextNut: string;
 
-  /** The relative URL to be passed back for the next communication from the client. */
+  /**
+   * The relative URL to be passed back in the qry= server response field for
+   * the next communication from the client.
+   */
   public nextUrl: string;
 
   /** Provides a Buffer version of primaryIdentityPublicKey. */
@@ -767,4 +808,13 @@ export class SQRLStrategyConfig {
    * body field (see https://www.grc.com/sqrl/semantics.htm).
    */
   public clientCancelAuthUrl?: string;
+}
+
+/** Data class containing information about a nut from identity storage. */
+export class SQRLNutInfo {
+  /** The unique nut nonce generated and sent to a client. */
+  public nut: string;
+  
+  /** The nut value from an original QR code, for backtracking from this later nut. */
+  public originalLoginNut?: string;
 }

@@ -66,7 +66,7 @@ describe('SqrlTestSite_Integration', () => {
       assert(startSqrlUrl > 0, 'SQRL URL link not found');
       startSqrlUrl += 25;
 
-      let endSqrlUrl = htmlString.indexOf('">', startSqrlUrl);
+      let endSqrlUrl = htmlString.indexOf(' ', startSqrlUrl) - 1/*end quote*/;
       assert(endSqrlUrl > startSqrlUrl, 'SQRL URL end not found');
 
       let sqrlUrl = htmlString.substring(startSqrlUrl, endSqrlUrl);

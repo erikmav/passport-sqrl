@@ -28,7 +28,7 @@ import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
 import * as spdy from 'spdy';
 import { promisify } from 'util';
-import { AuthCompletionInfo, ClientRequestInfo, ILogger, ISQRLIdentityStorage, SQRLExpress, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
+import { AuthCompletionInfo, ClientRequestInfo, ILogger, ISQRLIdentityStorage, SQRLExpress, SQRLNutInfo, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
 
 // TypeScript definitions for SPDY do not include an overload that allows the common
 // Express app pattern as a param. Inject an overload to avoid compilation errors.
@@ -134,14 +134,15 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
       // Used by login.ejs
       .get(pollNutRoute, (req, res) => {
         if (req.params.nut) {
-          this.pollNutAsync(req.params.nut)
-            .then(nutRecord => {
+          this.getNutInfoAsync(req.params.nut)
+            .then(nutInfo => {
+              let nutRecord = <NutDBRecord> nutInfo;  // Full record is returned below.
               if (!nutRecord) {
                 this.log.debug(`pollNut: ${req.params.nut}: No nut record, returning 404`);
                 res.statusCode = 404;
                 res.end();
               } else if (!nutRecord.loggedIn || !nutRecord.clientPrimaryIdentityPublicKey) {
-                this.log.debug(`pollNut: ${req.params.nut}: Nut not logged in`);
+                this.log.finest(() => `pollNut: ${req.params.nut}: Nut not logged in`);
                 res.send(<NutPollResult> { loggedIn: false });
               } else {
                 this.findUser(nutRecord.clientPrimaryIdentityPublicKey, (err: Error, userDBRecord: UserDBRecord | null) => {
@@ -236,8 +237,12 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
    *    was logged in. In that case we log the browser on and return the usual
    *    ambient user profile reference in the cookie.
    */
-  public async nutIssuedToClientAsync(sqrlUrlAndNut: SQRLUrlAndNut): Promise<void> {
-    return (<any> this.nutTable).insertAsync(new NutDBRecord(sqrlUrlAndNut.nutString, sqrlUrlAndNut.url));
+  public async nutIssuedToClientAsync(sqrlUrlAndNut: SQRLUrlAndNut, originalLoginNut?: string): Promise<void> {
+    return (<any> this.nutTable).insertAsync(new NutDBRecord(sqrlUrlAndNut.nutString, sqrlUrlAndNut.url, originalLoginNut));
+  }
+
+  public async getNutInfoAsync(nut: string): Promise<SQRLNutInfo | null> {
+    return this.getNutRecordAsync(nut);  // NutDBRecord derives from SQRLNutInfo.
   }
 
   public async query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
@@ -250,7 +255,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     return authInfo;
   }
 
-  public async ident(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public async ident(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo> {
     // SQRL login request.
     let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
     if (authInfo.user) {
@@ -266,16 +271,28 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
         let searchRecord = <UserDBRecord> {
           sqrlPrimaryIdentityPublicKey: clientRequestInfo.previousIdentityPublicKey
         };
-        await (<any> this.userTable).updateAsync(searchRecord, user);
+        authInfo.user = await (<any> this.userTable).updateAsync(searchRecord, user);
       }
-      return authInfo;
+    } else {
+      // Didn't already exist, create an initial version.
+      let newRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
+      let result: UserDBRecord = await (<any> this.userTable).insertAsync(newRecord);
+      authInfo.user = result;
+      authInfo.tifValues = 0;
     }
 
-    // Didn't already exist, create an initial version if this is a login API request.
-    let newRecord = UserDBRecord.newFromClientRequestInfo(clientRequestInfo);
-    let result: UserDBRecord = await (<any> this.userTable).insertAsync(newRecord);
-    authInfo.user = result;
-    authInfo.tifValues = 0;
+    // Update the nut record for the original SQRL URL, which may be getting polled by the /pollNut
+    // route right now, with a reference to the user record.
+    let originalNutRecord: NutDBRecord | null = <NutDBRecord> nutInfo;  // Full info was returned from our query
+    if (originalNutRecord.originalLoginNut) {
+      // We have a later nut record, find the original.
+      originalNutRecord = await this.getNutRecordAsync(originalNutRecord.originalLoginNut);
+    }
+    if (originalNutRecord) {  // May have become null when trying to find the original if it was timed out from storage
+      originalNutRecord.loggedIn = true;
+      originalNutRecord.clientPrimaryIdentityPublicKey = (<UserDBRecord> authInfo.user).sqrlPrimaryIdentityPublicKey;
+      await (<any> this.nutTable).updateAsync({ nut: originalNutRecord.nut }, originalNutRecord);
+    }
     return authInfo;
   }
 
@@ -294,9 +311,9 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     return Promise.resolve(new AuthCompletionInfo());  // TODO
   }
 
-  /** Returns null if not found. */
-  private async pollNutAsync(nut: string): Promise<NutDBRecord | null> {
-    return (<any> this.nutTable).findOneAsync(<NutDBRecord> { nut: nut });
+  private async getNutRecordAsync(nut: string): Promise<NutDBRecord | null> {
+    let searchRecord = { nut: nut };
+    return (<any> this.nutTable).findOneAsync(searchRecord);
   }
 
   private findUser(sqrlPublicKey: string, done: (err: Error, doc: any) => void): void {
@@ -310,31 +327,26 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
   private async findUserByEitherKey(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     let result = new AuthCompletionInfo();
 
-    // Treat the SQRL client's public key as a primary search key in the database.
-    let searchRecord = <UserDBRecord> {
-      sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
-    };
-    let primaryKeyDoc: UserDBRecord = await (<any> this.userTable).findOneAsync(searchRecord);
-    if (primaryKeyDoc != null) {
-      result.user = primaryKeyDoc;
-      // tslint:disable-next-line:no-bitwise
-      result.tifValues |= TIFFlags.CurrentIDMatch;
-    } else {
-      // Not found by primary key. Maybe this is an identity change situation.
-      // If a previous key was provided, search again.
-      if (clientRequestInfo.previousIdentityPublicKey) {
-        searchRecord.sqrlPrimaryIdentityPublicKey = clientRequestInfo.previousIdentityPublicKey;
-        let prevKeyDoc: UserDBRecord = await (<any> this.userTable).findOneAsync(searchRecord);
-        if (prevKeyDoc) {
-          result.user = prevKeyDoc;
-          // tslint:disable-next-line:no-bitwise
-          result.tifValues |= TIFFlags.PreviousIDMatch;
-        }
+    // Search for both keys simultaneously if the previous key is specified.
+    let keyMatches = [
+      { sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey }
+    ];
+    if (clientRequestInfo.previousIdentityPublicKey) {
+      keyMatches.push({ sqrlPrimaryIdentityPublicKey: clientRequestInfo.previousIdentityPublicKey });
+    }
+    let searchRecord = { $or: keyMatches };
+
+    let doc: UserDBRecord = await (<any> this.userTable).findOneAsync(searchRecord);
+    if (doc != null) {
+      result.user = doc;
+      if (doc.sqrlPrimaryIdentityPublicKey === clientRequestInfo.primaryIdentityPublicKey) {
+        // tslint:disable-next-line:no-bitwise
+        result.tifValues |= TIFFlags.CurrentIDMatch;
+      } else {
+        // tslint:disable-next-line:no-bitwise
+        result.tifValues |= TIFFlags.PreviousIDMatch;
       }
     }
-    // TODO: Convert to recommended algorithm for detection.
-    // tslint:disable-next-line:no-bitwise
-    result.tifValues |= TIFFlags.IPAddressesMatch;
     return result;
   }
 
@@ -451,13 +463,10 @@ class UserDBRecord {
   public sqrlHardLockSqrlUse: boolean = false;
 }
 
-class NutDBRecord {
+class NutDBRecord extends SQRLNutInfo {
   // _id is implicit from NeDB.
   // tslint:disable-next-line
   public _id?: string;
-
-  /** The unique nut nonce generated and sent to a client. */
-  public nut: string;
 
   /** The URL containing the nut. */
   public url?: string;
@@ -468,12 +477,14 @@ class NutDBRecord {
   /** Whether the nut was successfully logged in. Updated on login. */
   public loggedIn: boolean;
 
-  /** The primary public key used for login, for looking up the user record. Updated on login. */
+  /** The primary public key of a user if a successful login was recorded for this nut. */
   public clientPrimaryIdentityPublicKey?: string;
 
-  constructor(nut: string, url?: string) {
+  constructor(nut: string, url?: string, originalLoginNut?: string) {
+    super();
     this.nut = nut;
     this.url = url;
+    this.originalLoginNut = originalLoginNut;
     this.createdAt = new Date();
   }
 }
