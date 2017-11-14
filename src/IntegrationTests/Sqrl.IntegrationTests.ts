@@ -9,32 +9,13 @@ import * as request from 'request';
 import * as requestPromise from 'request-promise-native';
 import * as rimraf from 'rimraf';
 import { ILogger, LogLevel, TIFFlags } from '../passport-sqrl';
+import { MockLogger } from '../SqrlTests/MockLogger';
 import { MockSQRLClient, ServerResponseInfo } from '../SqrlTests/MockSQRLClient';
 import * as testSite from '../testSite/TestSiteHandler';
 
 const testSitePort = 14001;
 const serverTlsCertDir = __dirname;
 const serverTlsCert = serverTlsCertDir + "/TestSite.FullChain.Cert.pem";
-
-class MockLogger implements ILogger {
-  public logLevel: LogLevel;
-
-  public error(message: string): void {
-    console.log(`ERROR: ${message}`);
-  }
-  public warning(message: string): void {
-    console.log(`Warn: ${message}`);
-  }
-  public info(message: string): void {
-    console.log(message);
-  }
-  public debug(message: string): void {
-    console.log(message);
-  }
-  public finest(messageGenerator: () => string): void {
-    console.log(messageGenerator());
-  }
-}
 
 describe('SqrlTestSite_Integration', () => {
   describe('InitialBrowserRequestNoCookieRedirectedToLogin', () => {

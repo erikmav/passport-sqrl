@@ -66,7 +66,6 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     this.log = log;
     let webSiteDir = path.join(__dirname, 'WebSite');
     const sqrlApiRoute = '/sqrl';
-    const sqrlLoginRoute = '/sqrlLogin';
     const loginPageRoute = '/login';
     const pollNutRoute = '/pollNut/:nut';
     const loginSuccessRedirect = '/';
@@ -82,12 +81,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
 
     this.sqrlApiHandler = new SQRLExpress(this, this.log, sqrlConfig);
 
-    this.sqrlPassportStrategy = new SQRLStrategy(sqrlConfig,
-      (clientRequestInfo: ClientRequestInfo) => this.query(clientRequestInfo),
-      (clientRequestInfo: ClientRequestInfo) => this.ident(clientRequestInfo),
-      (clientRequestInfo: ClientRequestInfo) => this.disable(clientRequestInfo),
-      (clientRequestInfo: ClientRequestInfo) => this.enable(clientRequestInfo),
-      (clientRequestInfo: ClientRequestInfo) => this.remove(clientRequestInfo));
+    this.sqrlPassportStrategy = new SQRLStrategy(this.log, sqrlConfig);
     passport.use(this.sqrlPassportStrategy);
     passport.serializeUser((user: UserDBRecord, done) => done(null, user.sqrlPrimaryIdentityPublicKey));
     passport.deserializeUser((id: any, done: (err: Error, doc: any) => void) => this.findUser(id, done));
@@ -97,7 +91,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
       .set('view engine', 'ejs')
       .set('views', path.join(__dirname, 'views'))
       .use(expressLayouts)
-      .use(favicon(webSiteDir + '/favicon.ico'))  // First to handle quickly without passing through other middleware layers
+      .use(favicon(webSiteDir + '/favicon.ico'))  // Early to handle quickly without passing through other middleware layers
       .use(cookieParser())
       .use(bodyParser.json())  // Needed for parsing bodies (login)
       .use(bodyParser.urlencoded({extended: true}))  // Needed for parsing bodies (login)
@@ -110,7 +104,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
       .use(passport.session())
       .get(loginPageRoute, (req, res) => {
         this.log.debug('/login requested');
-        let urlAndNut: SQRLUrlAndNut = this.sqrlPassportStrategy.getSqrlUrl(req);
+        let urlAndNut: SQRLUrlAndNut = this.sqrlApiHandler.getSqrlUrl(req);
         this.nutIssuedToClientAsync(urlAndNut)
           .then(() => {
             let qrSvg = qr.imageSync(urlAndNut.url, { type: 'svg', parse_url: true });
@@ -123,12 +117,10 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
           });
       })
 
-      // NOTE: No SuccessRedirect, FailureRedirect - this is a web API more than a normal login endpoint.
-      // There can be multiple round-trips to this endpoint, typically for a query followed
-      // by a login request.
-      .post(sqrlLoginRoute, passport.authenticate('sqrl'))
-
-      // TODO: Keep? Refactor?
+      // The SQRL API and login sequence does not use the HTTP Authenticate header,
+      // but instead acts as a distinct API surface area. We use a distinct route
+      // just for handing its API calls, and use back-end storage mechanisms to
+      // complete the login on the user's behalf.
       .post(sqrlApiRoute, this.sqrlApiHandler.handleSqrlApi)
       
       // Used by login.ejs
