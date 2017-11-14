@@ -134,25 +134,25 @@ export interface ISQRLIdentityStorage {
    * information. For a sample implementation see the NeDB implementation in the demo site
    * in the pasport-sqrl Git repo.
    */
-  nutIssuedToClientAsync(urlAndNut: SQRLUrlAndNut, originalLoginNut?: string): Promise<void>;
+  nutIssuedToClientAsync(urlAndNut: UrlAndNut, originalLoginNut?: string): Promise<void>;
 
   /** Retrieves stored information about a nut value. */
-  getNutInfoAsync(nut: string): Promise<SQRLNutInfo | null>;
+  getNutInfoAsync(nut: string): Promise<NutInfo | null>;
 
   /** Called by the SQRL strategy on a SQRL client call to verify access. */
-  query(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
+  query(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
   /** Called by the SQRL strategy on a SQRL client call to log in. */
-  ident(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
+  ident(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
   /** Called by the SQRL strategy on a SQRL client call to disable a SQRL identity. */
-  disable(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
+  disable(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
   /** Called by the SQRL strategy on a SQRL client call to enable a SQRL identity. */
-  enable(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
+  enable(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
   /** Called by the SQRL strategy on a SQRL client call to remove a SQRL identity. */
-  remove(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo>;
+  remove(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 }
 
 /**
@@ -207,10 +207,10 @@ export class SQRLExpress {
    * The URL should be passed though a QR-Code generator to
    * produce the SQRL login QR for the client.
    */
-  public getSqrlUrl(req: express.Request): SQRLUrlAndNut {
+  public getSqrlUrl(req: express.Request): UrlAndNut {
     let nut: string | Buffer = this.nutGenerator(req);
     let nutString = SqrlUrlFactory.nutToString(nut);
-    return new SQRLUrlAndNut(this.urlFactory.create(nutString), nut, nutString);
+    return new UrlAndNut(this.urlFactory.create(nutString), nut, nutString);
   }
 
   /**
@@ -272,14 +272,14 @@ export class SQRLExpress {
     if (clientRequestInfo.protocolVersion !== 1) {
       throw new Error(`This server only handles SQRL protocol revision 1`);
     }
-    let nutInfoPromise: Promise<SQRLNutInfo | null> = this.identityStorage.getNutInfoAsync(clientRequestInfo.nut);
+    let nutInfoPromise: Promise<NutInfo | null> = this.identityStorage.getNutInfoAsync(clientRequestInfo.nut);
 
     let nextNut: string | Buffer = this.nutGenerator(req);
     let nextNutStr = SqrlUrlFactory.nutToString(nextNut);
     let nextUrl = this.config.urlPath + '?nut=' + nextNutStr;
-    let urlAndNut = new SQRLUrlAndNut(nextUrl, nextNut, nextNutStr);
+    let urlAndNut = new UrlAndNut(nextUrl, nextNut, nextNutStr);
 
-    let nutInfo: SQRLNutInfo | null = await nutInfoPromise;
+    let nutInfo: NutInfo | null = await nutInfoPromise;
     if (!nutInfo) {
       throw new Error('Client presented unknown nut value');
     }
@@ -420,7 +420,7 @@ export class AuthenticateAsyncResult {
 }
 
 /** A SQRL URL and its contained nut, broken out to separate fields for varying purposes. */
-export class SQRLUrlAndNut {
+export class UrlAndNut {
   public url: string;
   public nut: string | Buffer;
   public nutString: string;
@@ -646,7 +646,7 @@ export class SQRLStrategyConfig {
 }
 
 /** Data class containing information about a nut from identity storage. */
-export class SQRLNutInfo {
+export class NutInfo {
   /** The unique nut nonce generated and sent to a client. */
   public nut: string;
   

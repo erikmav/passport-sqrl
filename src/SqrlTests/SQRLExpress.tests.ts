@@ -2,7 +2,7 @@
 
 import { assert } from "chai";
 import * as express from 'express';
-import { AuthCallback, AuthCompletionInfo, AuthenticateAsyncResult, ClientRequestInfo, ILogger, ISQRLIdentityStorage, SQRLExpress, SQRLNutInfo, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
+import { AuthCallback, AuthCompletionInfo, AuthenticateAsyncResult, ClientRequestInfo, ILogger, ISQRLIdentityStorage, NutInfo, SQRLExpress, SQRLStrategyConfig, TIFFlags, UrlAndNut } from '../passport-sqrl';
 import { MockLogger } from '../SqrlTests/MockLogger';
 import { MockSQRLClient, ServerResponseInfo } from './MockSqrlClient';
 
@@ -16,7 +16,7 @@ describe('SQRLExpress', () => {
           domainExtension: 6,
         });
 
-      let urlAndNut: SQRLUrlAndNut = sqrl.getSqrlUrl(<express.Request> { });
+      let urlAndNut: UrlAndNut = sqrl.getSqrlUrl(<express.Request> { });
       assert.equal(urlAndNut.url.substring(0, 28), 'sqrl://domain.com/login?nut=');
       // 22 characters of base64 for 128 bits - should be random
       assert.equal(urlAndNut.url.substring(28 + 22), "&x=6");
@@ -41,7 +41,7 @@ describe('SQRLExpress', () => {
         }
       });
 
-      let urlAndNut: SQRLUrlAndNut = sqrl.getSqrlUrl(<express.Request> { });
+      let urlAndNut: UrlAndNut = sqrl.getSqrlUrl(<express.Request> { });
       assert.equal(urlAndNut.url, 'sqrl://domain.com/login?nut=nuts!');
       assert.equal(urlAndNut.nut, 'nuts!');
 
@@ -75,9 +75,9 @@ describe('SQRLExpress', () => {
           user: { name: "bob" }
         });
       };
-      storage.onGetNutInfo = (nut: string): SQRLNutInfo | null => {
+      storage.onGetNutInfo = (nut: string): NutInfo | null => {
         if (nut === '1234') {
-          return <SQRLNutInfo> { nut: '1234' };
+          return <NutInfo> { nut: '1234' };
         }
         return null;
       };
@@ -133,25 +133,25 @@ class MockSQRLIdentityStorage implements ISQRLIdentityStorage {
   public onDisable: AuthCallback;
   public onEnable: AuthCallback;
   public onRemove: AuthCallback;
-  public onNutIssuedToClient: (urlAndNut: SQRLUrlAndNut, originalLoginNut?: string) => void;
-  public onGetNutInfo: (nut: string) => SQRLNutInfo | null;
+  public onNutIssuedToClient: (urlAndNut: UrlAndNut, originalLoginNut?: string) => void;
+  public onGetNutInfo: (nut: string) => NutInfo | null;
 
   private issuedNuts: any = {};
 
-  public nutIssuedToClientAsync(urlAndNut: SQRLUrlAndNut, originalLoginNut?: string): Promise<void> {
+  public nutIssuedToClientAsync(urlAndNut: UrlAndNut, originalLoginNut?: string): Promise<void> {
     this.nutIssuedToClientCalls++;
     if (this.onNutIssuedToClient) {
       this.onNutIssuedToClient(urlAndNut, originalLoginNut);
       return Promise.resolve();
     }
-    this.issuedNuts[urlAndNut.nutString] = <SQRLNutInfo> {
+    this.issuedNuts[urlAndNut.nutString] = <NutInfo> {
       nut: urlAndNut.nutString,
       originalLoginNut: originalLoginNut
     };
     return Promise.resolve();
   }
 
-  public getNutInfoAsync(nut: string): Promise<SQRLNutInfo | null> {
+  public getNutInfoAsync(nut: string): Promise<NutInfo | null> {
     this.getNutInfoCalls++;
     if (this.onGetNutInfo) {
       return Promise.resolve(this.onGetNutInfo(nut));
@@ -159,7 +159,7 @@ class MockSQRLIdentityStorage implements ISQRLIdentityStorage {
     return Promise.resolve(this.issuedNuts[nut]);
   }
   
-  public query(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo> {
+  public query(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo> {
     this.queryCalls++;
     if (this.onQuery) {
       return this.onQuery(clientRequestInfo);
@@ -167,7 +167,7 @@ class MockSQRLIdentityStorage implements ISQRLIdentityStorage {
     return Promise.resolve(<AuthCompletionInfo> {});
   }
 
-  public ident(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo> {
+  public ident(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo> {
     this.identCalls++;
     if (this.onIdent) {
       return this.onIdent(clientRequestInfo);
@@ -175,7 +175,7 @@ class MockSQRLIdentityStorage implements ISQRLIdentityStorage {
     return Promise.resolve(<AuthCompletionInfo> {});
   }
 
-  public disable(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo> {
+  public disable(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo> {
     this.disableCalls++;
     if (this.onDisable) {
       return this.onDisable(clientRequestInfo);
@@ -183,7 +183,7 @@ class MockSQRLIdentityStorage implements ISQRLIdentityStorage {
     return Promise.resolve(<AuthCompletionInfo> {});
   }
 
-  public enable(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo> {
+  public enable(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo> {
     this.enableCalls++;
     if (this.onEnable) {
       return this.onEnable(clientRequestInfo);
@@ -191,7 +191,7 @@ class MockSQRLIdentityStorage implements ISQRLIdentityStorage {
     return Promise.resolve(<AuthCompletionInfo> {});
   }
 
-  public remove(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo> {
+  public remove(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo> {
     this.removeCalls++;
     if (this.onRemove) {
       return this.onRemove(clientRequestInfo);

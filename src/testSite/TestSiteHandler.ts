@@ -28,7 +28,7 @@ import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
 import * as spdy from 'spdy';
 import { promisify } from 'util';
-import { AuthCompletionInfo, ClientRequestInfo, ILogger, ISQRLIdentityStorage, SQRLExpress, SQRLNutInfo, SQRLStrategy, SQRLStrategyConfig, SQRLUrlAndNut, TIFFlags } from '../passport-sqrl';
+import { AuthCompletionInfo, ClientRequestInfo, ILogger, ISQRLIdentityStorage, NutInfo, SQRLExpress, SQRLStrategy, SQRLStrategyConfig, TIFFlags, UrlAndNut } from '../passport-sqrl';
 
 // TypeScript definitions for SPDY do not include an overload that allows the common
 // Express app pattern as a param. Inject an overload to avoid compilation errors.
@@ -104,7 +104,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
       .use(passport.session())
       .get(loginPageRoute, (req, res) => {
         this.log.debug('/login requested');
-        let urlAndNut: SQRLUrlAndNut = this.sqrlApiHandler.getSqrlUrl(req);
+        let urlAndNut: UrlAndNut = this.sqrlApiHandler.getSqrlUrl(req);
         this.nutIssuedToClientAsync(urlAndNut)
           .then(() => {
             let qrSvg = qr.imageSync(urlAndNut.url, { type: 'svg', parse_url: true });
@@ -229,12 +229,12 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
    *    was logged in. In that case we log the browser on and return the usual
    *    ambient user profile reference in the cookie.
    */
-  public async nutIssuedToClientAsync(sqrlUrlAndNut: SQRLUrlAndNut, originalLoginNut?: string): Promise<void> {
-    return (<any> this.nutTable).insertAsync(new NutDBRecord(sqrlUrlAndNut.nutString, sqrlUrlAndNut.url, originalLoginNut));
+  public async nutIssuedToClientAsync(urlAndNut: UrlAndNut, originalLoginNut?: string): Promise<void> {
+    return (<any> this.nutTable).insertAsync(new NutDBRecord(urlAndNut.nutString, urlAndNut.url, originalLoginNut));
   }
 
-  public async getNutInfoAsync(nut: string): Promise<SQRLNutInfo | null> {
-    return this.getNutRecordAsync(nut);  // NutDBRecord derives from SQRLNutInfo.
+  public async getNutInfoAsync(nut: string): Promise<NutInfo | null> {
+    return this.getNutRecordAsync(nut);  // NutDBRecord derives from NutInfo.
   }
 
   public async query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
@@ -247,7 +247,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     return authInfo;
   }
 
-  public async ident(clientRequestInfo: ClientRequestInfo, nutInfo: SQRLNutInfo): Promise<AuthCompletionInfo> {
+  public async ident(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo> {
     // SQRL login request.
     let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
     if (authInfo.user) {
@@ -455,7 +455,7 @@ class UserDBRecord {
   public sqrlHardLockSqrlUse: boolean = false;
 }
 
-class NutDBRecord extends SQRLNutInfo {
+class NutDBRecord extends NutInfo {
   // _id is implicit from NeDB.
   // tslint:disable-next-line
   public _id?: string;
