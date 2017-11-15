@@ -4,7 +4,6 @@
 import * as bodyParser from 'body-parser';
 import { assert } from "chai";
 import * as fs from 'fs';
-import * as http from "http";
 import * as request from 'request';
 import * as requestPromise from 'request-promise-native';
 import * as rimraf from 'rimraf';

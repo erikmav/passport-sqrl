@@ -200,13 +200,17 @@ class MockSQRLIdentityStorage implements ISQRLIdentityStorage {
   }
 }
 
-/** Overrides Passport Strategy error(), success() calls from base PassportJS Strategy to hook for unit testing. */
+/** Exposes base class protected members as public for unit testing. */
 class MockSQRLExpress extends SQRLExpress {
   public storage: MockSQRLIdentityStorage;
 
   constructor(mockStorage: MockSQRLIdentityStorage, log: ILogger, config: SQRLStrategyConfig) {
     super(mockStorage, log, config);
     this.storage = mockStorage;
+  }
+
+  public async authenticateAsync(req: express.Request): Promise<AuthenticateAsyncResult> {
+    return super.authenticateAsync(req);
   }
 }
 

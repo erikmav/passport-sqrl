@@ -19,7 +19,6 @@ import * as express from 'express';
 import * as expressLayouts from 'express-ejs-layouts';
 import * as expressSession from 'express-session';
 import * as fs from 'fs';
-import * as http from 'http';
 import * as neDB from 'nedb';
 import * as os from 'os';
 import * as passport from 'passport';
@@ -79,8 +78,13 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
       urlPath: sqrlApiRoute,
     };
 
+    // The SQRL API needs its own dedicated API endpoint. SQRLExpress
+    // handles this API for us.
     this.sqrlApiHandler = new SQRLExpress(this, this.log, sqrlConfig);
 
+    // Configure PassportJS with the SQRL Strategy. PassportJS will add the
+    // implicit res.login() method used later on. We use the SQRL primary
+    // public key as the key for the identity.
     this.sqrlPassportStrategy = new SQRLStrategy(this.log, sqrlConfig);
     passport.use(this.sqrlPassportStrategy);
     passport.serializeUser((user: UserDBRecord, done) => done(null, user.sqrlPrimaryIdentityPublicKey));
@@ -88,13 +92,21 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
 
     // Useful: http://toon.io/understanding-passportjs-authentication-flow/
     const app = express()
+      // ----------------------------------------------------------------------
+      // Layout and default parsers
+      // ----------------------------------------------------------------------
       .set('view engine', 'ejs')
       .set('views', path.join(__dirname, 'views'))
       .use(expressLayouts)
       .use(favicon(webSiteDir + '/favicon.ico'))  // Early to handle quickly without passing through other middleware layers
       .use(cookieParser())
-      .use(bodyParser.json())  // Needed for parsing bodies (login)
       .use(bodyParser.urlencoded({extended: true}))  // Needed for parsing bodies (login)
+
+      // ----------------------------------------------------------------------
+      // Session: We use sessions for ambient cookie-based login.
+      // NOTE: If you're copying this for use in your own site, you need to
+      // replace the secret below with a secret deployed securely.
+      // ----------------------------------------------------------------------
       .use(expressSession({  // Session load+decrypt support, must come before passport.session
         secret: 'SQRL-Test',  // SECURITY: If reusing site code, you need to supply this secret from a real secret store.
         resave: true,
@@ -102,6 +114,10 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
       }))
       .use(passport.initialize())
       .use(passport.session())
+
+      // ----------------------------------------------------------------------
+      // The /login route displays a SQRL QR code.
+      // ----------------------------------------------------------------------
       .get(loginPageRoute, (req, res) => {
         this.log.debug('/login requested');
         let urlAndNut: UrlAndNut = this.sqrlApiHandler.getSqrlUrl(req);
@@ -117,18 +133,21 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
           });
       })
 
-      // The SQRL API and login sequence does not use the HTTP Authenticate header,
-      // but instead acts as a distinct API surface area. We use a distinct route
-      // just for handing its API calls, and use back-end storage mechanisms to
-      // complete the login on the user's behalf.
+      // ----------------------------------------------------------------------
+      // The SQRL API and login sequence does not use the HTTP Authenticate
+      // header, but instead acts as a distinct API surface area. We use a
+      // dedicated route just for handing its API calls, and use back-end
+      // storage mechanisms to complete the login on the user's behalf.
+      // ----------------------------------------------------------------------
       .post(sqrlApiRoute, this.sqrlApiHandler.handleSqrlApi)
       
+      // ----------------------------------------------------------------------
       // Used by login.ejs
+      // ----------------------------------------------------------------------
       .get(pollNutRoute, (req, res) => {
         if (req.params.nut) {
-          this.getNutInfoAsync(req.params.nut)
-            .then(nutInfo => {
-              let nutRecord = <NutDBRecord> nutInfo;  // Full record is returned below.
+          this.getNutRecordAsync(req.params.nut)
+            .then(nutRecord => {
               if (!nutRecord) {
                 this.log.debug(`pollNut: ${req.params.nut}: No nut record, returning 404`);
                 res.statusCode = 404;
@@ -170,6 +189,12 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
           res.end();
         }
       })
+
+      // ----------------------------------------------------------------------
+      // Main page. Redirects to /login if there is no logged-in user
+      // via the client cookie. Otherwise, relies on the implicit PassportJS
+      // user record lookup configured above.
+      // ----------------------------------------------------------------------
       .get('/', (req, res) => {
         this.log.debug('/ requested');
         if (!req.user) {
@@ -177,20 +202,19 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
         } else {
           res.render('index', {
             subpageName: 'Main',
-            username: req.user.name,  // TODO get user, other info from client session cookie ref to back-end session store
+            username: req.user.name,
             sqrlPublicKey: req.user.sqrlPrimaryIdentityPublicKey
           });
         }
       })
       .use(express.static(webSiteDir));  // Serve static scripts and assets. Must come after non-file (e.g. templates, REST) middleware
 
+    // SQRL requires HTTPS so we use SPDY which happily gives us HTTP/2 at the same time.
+    // Node 8.6+ contains a native HTTP/2 module we can move to over time.
     this.testSiteServer = spdy.server.create(<spdy.server.ServerOptions> {
       // Leaf cert PEM files for server certificate. See CreateLeaf.cmd and related scripts.
       cert: fs.readFileSync(serverTlsCert),
       key: fs.readFileSync(serverTlsKey),
-
-      // SPDY module supports Bunyan.
-      // TODO: Seems like we need a way to bypass TS strong typing:  log: log,
 
       // SPDY-specific options
       spdy: {
@@ -209,26 +233,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     this.testSiteServer.close();
   }
 
-  /**
-   * When we issue a SQRL URL, the nut (and the URL itself) act as a one-time nonce
-   * for that specific client. (Use of HTTPS for the site prevents disclosure to
-   * a man-in-the-middle.) We need to track the nut values for phone login.
-   * There are two important cases:
-   * 
-   * 1. Login is performed in a browser with a browser plugin. The plugin will
-   *    specify the cps option to the SQRL API, which means the plugin acts as
-   *    a go-between, sending the client's public key and signed SQRL URL, and
-   *    on 200 Success it uses the cps response as a success redirect. In this
-   *    case, the full query is handled by the plugin.
-   * 
-   * 2. Login is performed by a phone against the QR-Code of the URL. The phone
-   *    SQRL app contacts the SQRL API and presents the client's public key and
-   *    signed SQRL URL, but (usually) without the cps option, as the phone app
-   *    cannot redirect the browser. For this case, we need to track recent
-   *    nut values and have the page poll an ajax REST endpoint seeing if the nut
-   *    was logged in. In that case we log the browser on and return the usual
-   *    ambient user profile reference in the cookie.
-   */
+  // See doc comments on ISQRLIdentityStorage.nutIssuedToClientAsync().
   public async nutIssuedToClientAsync(urlAndNut: UrlAndNut, originalLoginNut?: string): Promise<void> {
     return (<any> this.nutTable).insertAsync(new NutDBRecord(urlAndNut.nutString, urlAndNut.url, originalLoginNut));
   }
@@ -305,7 +310,8 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
 
   private async getNutRecordAsync(nut: string): Promise<NutDBRecord | null> {
     let searchRecord = { nut: nut };
-    return (<any> this.nutTable).findOneAsync(searchRecord);
+    let nutRecord: NutDBRecord | null = await (<any> this.nutTable).findOneAsync(searchRecord);
+    return nutRecord;
   }
 
   private findUser(sqrlPublicKey: string, done: (err: Error, doc: any) => void): void {

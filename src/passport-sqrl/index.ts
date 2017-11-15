@@ -118,40 +118,127 @@ export interface ILogger {
  */
 export interface ISQRLIdentityStorage {
   /**
-   * Stores a nut and an optional related URL issued to a client, along with
-   * an optional reference to a predecessor nut value originally presented in a
-   * QR code to a user.
+   * Stores a nut issued to a client, along with an optional reference to a
+   * predecessor nut value originally presented in a QR code to a user.
+   * (If the nut is for an original QR code, originalLoginNut will be undefined
+   * or null.)
    * 
-   * This information is typically used in a site polling query (like the /pollNut route in the
-   * demo site in the passport-sqrl Git repo) waiting for a completed login sequence. Because
-   * the SQRL API typically involves multiple round trips to the server and does not fit within
-   * the single round trip authentication model used by PassportJS, tracking recent nuts and their
-   * lineage back to a QR code is needed to allow mapping of presented nut values to final logins.
+   * When we issue a SQRL URL, the nut (and the URL itself) act as a one-time nonce
+   * for that specific client. Use of HTTPS for the site prevents disclosure to
+   * a man-in-the-middle. There are two important user use cases:
    * 
-   * The implementation should store this information in a rapid, distributed lookup storage system
-   * like a cache layer (e.g. Redis), with a limited time-to-live value (e.g. 12 hours) after which
-   * the nut is forgotten. It should also store any known user profile references along with this
-   * information. For a sample implementation see the NeDB implementation in the demo site
-   * in the pasport-sqrl Git repo.
+   * 1. Login is performed in a browser with SQRL browser plugin. The plugin will
+   *    specify the cps option to the SQRL API, which means the plugin acts as
+   *    a go-between, sending the client's public key and signed SQRL URL, and
+   *    on 200 Success it uses the cps response as a success redirect. In this
+   *    case, the full query is handled by the plugin.
+   * 
+   * 2. Login is performed by a separate desktop app or a phone app against the
+   *    QR-Code of the URL. The SQRL app contacts the SQRL API and presents the
+   *    client's public key and signed SQRL URL, but (usually) without the cps
+   *    option, as the app cannot redirect the browser. For this case, a typical
+   *    site implementation is to track recent nut values and have a logon page
+   *    poll an ajax REST endpoint seeing if the nut was logged in. In that case
+   *    the site logs the browser on using an explicit PassportJS res.login()
+   *    call to return the user profile reference in the site cookie. See the
+   *    /pollNut route in the demo site in the passport-sqrl repo.
+   * 
+   * Because the SQRL API typically involves multiple round trips to the server
+   * (or server cluster behind a VIP) and does not fit within the single round
+   * trip authentication model used by PassportJS, tracking recent nuts and their
+   * lineage back to a QR code is needed to allow mapping of presented nut
+   * values to final logins.
+   * 
+   * The implementation should store this information in a rapid, distributed
+   * lookup storage system like a cache layer (e.g. Redis), with a limited
+   * time-to-live value (e.g. 12 hours) after which the nut is forgotten.
+   * It should also store any known user profile references along with this
+   * information. For a sample implementation see the in-memory NeDB
+   * implementation in the demo site in the pasport-sqrl Git repo.
    */
   nutIssuedToClientAsync(urlAndNut: UrlAndNut, originalLoginNut?: string): Promise<void>;
 
-  /** Retrieves stored information about a nut value. */
+  /**
+   * Retrieves stored information about a nut value.
+   * See comments on nutIssuedToClientAsync() for more details.
+   */
   getNutInfoAsync(nut: string): Promise<NutInfo | null>;
 
-  /** Called by the SQRL strategy on a SQRL client call to verify access. */
+  /**
+   * Called on a SQRL client call to verify access, once the client message
+   * signature(s) have been validated.
+   * 
+   * A typical storage schema uses the ClientRequestInfo.primaryIdentityPublicKey
+   * as a primary key for reference. However, ClientRequestInfo.previousIdentityPublicKey,
+   * if present, may contain an old public key that the user is seeking to change,
+   * and the storage layer needs to check that key against its public key index as well.
+   * 
+   * This method should not create or update any new user records, just return
+   * whether the storage layer knows about the user's identity keys by setting
+   * AuthCompletionInfo.tifValues. If the primaryIdentityPublicKey matches a
+   * known user record, set TIFFlags.CurrentIDMatch; if the primary identity
+   * key is unknown but a user record exists under the previousIdentityPublicKey,
+   * set TIFFlags.PreviousIDMatch.
+   * 
+   * If the user profile has previously been disabled, no record updates should be
+   * performed and TIFFlags.IDDisabled should be set in AuthCompletionInfo.tifValues.
+   */
   query(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
-  /** Called by the SQRL strategy on a SQRL client call to log in. */
+  /**
+   * Called on a SQRL client call to log in, once the client message
+   * signature(s) have been validated.
+   * 
+   * If the user is not previously known under ClientRequestInfo.primaryIdentityPublicKey
+   * or ClientRequestInfo.previousIdentityPublicKey, a new user record should be created.
+   * 
+   * If a record already exists under previousIdentityPublicKey, this is a re-keying
+   * request and the primary public key for the user should be updated to the new
+   * primaryIdentityPublicKey.
+   * 
+   * This method should act in an idempotent manner with respect to login:
+   * it should allow multiple ident calls without error. This case is common
+   * in the case of client retries over a flaky network.
+   * 
+   * Any SQRL options specified in this request, such as useSqrlIdentityOnly or
+   * hardLockSqrlUse, should be updated in the user record as well, if the site honors
+   * these flags.
+   * 
+   * If the user profile has previously been disabled, no record updates should be
+   * performed and TIFFlags.IDDisabled should be set in AuthCompletionInfo.tifValues.
+   */
   ident(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
-  /** Called by the SQRL strategy on a SQRL client call to disable a SQRL identity. */
+  /**
+   * Called on a SQRL client call to disable a SQRL identity, once the client message
+   * signature(s) have been validated. The affected identity can be the one referred
+   * to by either ClientRequestInfo.primaryIdentityPublicKey or
+   * ClientRequestInfo.previousIdentityPublicKey.
+   * 
+   * This method should act in an idempotent manner with respect to disabling:
+   * it should allow multiple disable calls without error. This case is common
+   * in the case of client retries over a flaky network.
+   */
   disable(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
-  /** Called by the SQRL strategy on a SQRL client call to enable a SQRL identity. */
+  /**
+   * Called on a SQRL client call to enable a SQRL identity that was previously
+   * disabled, once the client message signature(s) have been validated.
+   * 
+   * This method should act in an idempotent manner with respect to enabling:
+   * it should allow multiple enable calls without error, e.g. if the account is
+   * not disbled it should simply take no action on the user record.
+   * This case is common in the case of client retries over a flaky network.
+   */
   enable(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
-  /** Called by the SQRL strategy on a SQRL client call to remove a SQRL identity. */
+  /**
+   * Called on a SQRL client call to remove a SQRL identity, once the client message
+   * signature(s) have been validated. The storage layer should delete (or,
+   * depending on site schema and old record storage model, mark as hidden)
+   * the related user record and prevent future logins using the primary and,
+   * if specified, previous identity public keys presented.
+   */
   remove(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 }
 
@@ -159,7 +246,7 @@ export interface ISQRLIdentityStorage {
  * ExpressJS middleware for the SQRL API.
  * Because SQRL does not use the HTTP Authenticate header in its data flow,
  * this handler is intended to be attached to a SQRL-specific route, e.g. '/sqrl',
- * that is not hooked into PassportJS. See the sample site in the pasport-sqrl repo.
+ * that is not hooked into PassportJS. See the sample site in the passport-sqrl repo.
  */
 export class SQRLExpress {
   private identityStorage: ISQRLIdentityStorage;
@@ -200,12 +287,9 @@ export class SQRLExpress {
   }
 
   /**
-   * Composes and returns a SQRL URL containing a unique "nut",
-   * plus the nut value for registration for the external
-   * phone login flow.
-   * 
-   * The URL should be passed though a QR-Code generator to
-   * produce the SQRL login QR for the client.
+   * Composes and returns a SQRL URL containing a unique "nut", plus the nut value for
+   * registration for the external app login flow. The URL should be passed though a
+   * QR-Code generator to produce the SQRL login QR for the client.
    */
   public getSqrlUrl(req: express.Request): UrlAndNut {
     let nut: string | Buffer = this.nutGenerator(req);
@@ -257,10 +341,9 @@ export class SQRLExpress {
   }
 
   /**
-   * Promisified version of authenticate(), public for unit testing.
-   * Not part of the PassportJS API.
+   * Promisified version of authenticate(). Not part of the public API.
    */
-  public async authenticateAsync(req: express.Request): Promise<AuthenticateAsyncResult> {
+  protected async authenticateAsync(req: express.Request): Promise<AuthenticateAsyncResult> {
     let params: any;
     if (req.method === "POST") {
       params = req.body;
