@@ -56,9 +56,11 @@ export class MockSQRLClient {
   private primaryIdentityPrivateKey: Buffer;
   private previousIdentityPrivateKeys: Buffer[] = [];
   private certValidationList: Buffer[];
+  private sqrlVersion: number;
   
-  constructor(sqrlUrl: string, numPreviousIdentities: number = 0) {
+  constructor(sqrlUrl: string, numPreviousIdentities: number = 0, sqrlVersion: number = 1) {
     this.originalSqrlUrl = sqrlUrl;
+    this.sqrlVersion = sqrlVersion;
     this.canonicalizedSqrlUrl = MockSQRLClient.canonicalizeSqrlUrl(sqrlUrl);
     this.serverContactUrl = MockSQRLClient.generateServerContactUrl(sqrlUrl);
 
@@ -121,7 +123,7 @@ export class MockSQRLClient {
     // Per SQRL client value protocol, the name-value pairs below will be joined in the same order
     // with CR and LF characters, then base64url encoded.
     let clientLines: string[] = [
-      'ver=1',
+      `ver=${this.sqrlVersion}`,
       `cmd=${cmd}`,
       'idk=' + base64url.encode(this.primaryIdentityPublicKey)
       // TODO: Add Server Unlock Key, and cases for Server Verify Unlock key

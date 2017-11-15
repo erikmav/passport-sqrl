@@ -90,6 +90,8 @@ describe('SQRLExpress', () => {
       });
       assert.equal(authResult.httpResponseCode, 200);
       assert.isUndefined(authResult.user, 'A query should not actually return the user');
+      assert.equal(storage.nutIssuedToClientCalls, 1);
+      assert.equal(storage.getNutInfoCalls, 1);
       assert.equal(storage.queryCalls, 1);
       assert.equal(storage.identCalls, 0);
       assert.equal(storage.disableCalls, 0);
@@ -107,6 +109,8 @@ describe('SQRLExpress', () => {
       assert.equal(authResult.httpResponseCode, 200, 'Success expected');
       assert(authResult.user, 'User record should be present');
       assert.equal('bob', authResult.user.name);
+      assert.equal(storage.nutIssuedToClientCalls, 2);
+      assert.equal(storage.getNutInfoCalls, 2);
       assert.equal(storage.queryCalls, 1);
       assert.equal(storage.identCalls, 1);
       assert.equal(storage.disableCalls, 0);
@@ -115,6 +119,29 @@ describe('SQRLExpress', () => {
       assert.isDefined(authResult.body);
       res = client.parseServerBody(authResult.body || '');
       assert.equal(res.tifValues, TIFFlags.CurrentIDMatch);
+    });
+  });
+
+  describe('queryUnknownSqrlVersionFails', () => {
+    it('should throw if the SQRL version is not supported', async () => {
+      let storage = new MockSQRLIdentityStorage();
+      let sqrl = new MockSQRLExpress(storage, new MockLogger(), <SQRLStrategyConfig> {
+          localDomainName: 'domain.com',
+          clientLoginSuccessUrl: '/',
+          clientCancelAuthUrl: '/login'
+        });
+
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=1234', 0, /*sqrlVersion:*/1000);
+      try {
+        let authResult: AuthenticateAsyncResult = await sqrl.authenticateAsync(<express.Request> {
+          method: "POST",
+          body: client.generatePostBody('query')
+        });
+        assert.fail('Expected exception not thrown');
+      } catch (e) {
+        let err = <Error> e;
+        assert.isTrue(err.message.indexOf('This server only handles SQRL protocol revision 1') >= 0);
+      }
     });
   });
 });

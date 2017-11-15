@@ -8,9 +8,7 @@ import { Strategy } from 'passport-strategy';
 import { SqrlBodyParser } from './SqrlBodyParser';
 import { SqrlUrlFactory } from './SqrlUrlFactory';
 
-// TODO: Unit test for getting error on incorrect version number
-// TODO: Add urlCheckCallback: Promise<boolean> with backing in cache-like storage
-// TODO: Do we allow multiple query calls on URLs? Multiple calls to any URL?
+// TODO: Unit test for made-up nut values (attacker client).
 // TODO: Unit test for incorrect client URL - attack by client making things up
 // TODO: Unit tests for missing client fields - bad client or attack
 // TODO: Support default implementation of encrypted nut and support TIFFlags.IPAddressesMatch
