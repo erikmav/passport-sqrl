@@ -16,4 +16,8 @@ if ERRORLEVEL 1 echo Creating intermediate failed with errorlevel %ERRORLEVEL% &
 
 copy /y TestSiteIntermediate.Cert.pem+RootCert.Cert.pem TestSite.FullChain.Cert.pem
 
+@rem .pem is not known to Windows, copy to .cer as well to allow installation via Windows Explorer.
+copy /y RootCert.Cert.pem RootCert.Cert.cer
+copy /y TestSiteIntermediate.Cert.pem TestSiteIntermediate.Cert.cer
+
 exit /b 0

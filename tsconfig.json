@@ -16,6 +16,7 @@
     // "importHelpers": true,                 /* Import emit helpers from 'tslib'. */
     // "downlevelIteration": true,            /* Provide full support for iterables in 'for-of', spread, and destructuring when targeting 'ES5' or 'ES3'. */
     // "isolatedModules": true,               /* Transpile each file as a separate module (similar to 'ts.transpileModule'). */
+    "newLine": "CRLF",                        /* Windows CRLF or *nix LF in emitted files */
                                               
     /* Strict Type-Checking Options */        
     "strict": true,                           /* Enable all strict type-checking options. */
@@ -31,9 +32,9 @@
     "noFallthroughCasesInSwitch": true,      /* Report errors for fallthrough cases in switch statement. */
     //"noResolve": true                      /* Do not add triple-slash references or module import targets to the list of compiled files. */
     //"noStrictGenericChecks": true,         /* Disable strict checking of generic signatures in function types. */
-    //"skipDefaultLibCheck": true,             /* */
-    "skipLibCheck": true,                    /* Skip type checking of declaration files. Requires TypeScript version 2.0 or later. */
-                                              
+    //"skipDefaultLibCheck": true,           /* */
+    "skipLibCheck": true                     /* Skip type checking of declaration files. Requires TypeScript version 2.0 or later. */
+
     /* Module Resolution Options */           
     // "moduleResolution": "node",            /* Specify module resolution strategy: 'node' (Node.js) or 'classic' (TypeScript pre-1.6). */
     // "baseUrl": "./",                       /* Base directory to resolve non-absolute module names. */

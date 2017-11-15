@@ -1,26 +1,34 @@
 {
   "name": "passport-sqrl",
-  "description": "PassportJS plug-in implementation of the Secure Quick Reliable Login protocol from Gibson Research",
   "version": "0.1.0",
+  "description": "ExpressJS and PassportJS implementation of the Secure Quick Reliable Login protocol from Gibson Research",
   "homepage": "https://github.com/erikma/passport-sqrl",
-  "repository": "https://github.com/erikma/passport-sqrl.git",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/erikma/passport-sqrl.git"
+  },
   "author": "Erik Mavrinac (https://github.com/erikma)",
-  "tags": [
+  "contributors": [],
+  "bugs": {
+    "url": "https://github.com/erikma/passport-sqrl/issues"
+  },
+  "keywords": [
     "sqrl",
     "passport",
     "passportjs",
     "nodejs",
     "node"
   ],
-  "files": [],
-  "bin": {},
-  "man": "",
-  "start": "node out/testSite/RunTestServer.js",
+  "main": "./index.js",
+  "types": "./index.d.ts",
   "dependencies": {
-    "@types/ed25519": "0.0.0",
+    "@types/ed25519": ">=0.0.0",
+    "@types/express": "^4.0.39",
+    "@types/passport": "^0.3.5",
+    "@types/passport-strategy": "^0.2.32",
     "base64url": "^2.0.0",
-    "body-parser": "^1.18.2",
-    "ed25519": "0.0.4",
+    "ed25519": ">=0.0.4",
+    "express": "^4.16.2",
     "passport": "^0.4.0",
     "passport-strategy": "^1.0.0"
   },
@@ -30,29 +38,27 @@
     "@types/chai": "^4.0.4",
     "@types/cookie-parser": "^1.4.1",
     "@types/ejs": "^2.3.33",
-    "@types/express": "^4.0.39",
     "@types/express-ejs-layouts": "^2.3.1",
     "@types/express-session": "^1.15.6",
     "@types/mocha": "^2.2.44",
     "@types/nedb": "^1.8.5",
     "@types/node": "^8.0.52",
-    "@types/passport": "^0.3.5",
-    "@types/passport-strategy": "^0.2.32",
     "@types/qr-image": "^3.2.1",
     "@types/request": "^2.0.8",
     "@types/request-promise-native": "^1.0.10",
     "@types/rimraf": "^2.0.2",
     "@types/serve-favicon": "^2.2.30",
     "@types/spdy": "^3.4.4",
+    "body-parser": "^1.18.2",
     "bunyan": "^1.8.12",
     "chai": "^4.1.2",
     "cookie-parser": "^1.4.3",
     "del": "^3.0.0",
     "ejs": "^2.5.7",
-    "express": "^4.16.2",
     "express-ejs-layouts": "^2.3.1",
     "express-session": "^1.15.6",
     "gulp": "^3.9.1",
+    "gulp-json-modify": "^1.0.2",
     "gulp-line-ending-corrector": "^1.0.1",
     "gulp-mocha": "^4.3.1",
     "gulp-sourcemaps": "^2.6.1",
@@ -71,9 +77,6 @@
     "ts-node": "~3.2.0",
     "tslint": "^5.8.0",
     "typescript": "^2.6.1"
-  },
-  "scripts": {
-    "start": "out/testSite/RunTestServer.js"
   },
   "engines": {
     "node": ">= 8.4.0"

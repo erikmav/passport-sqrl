@@ -1,7 +1,7 @@
 // Unit test suite for SqrlUrlFactory code.
 
 import { assert } from "chai";
-import { SqrlUrlFactory, toSqrlBase64, trimEqualsChars } from '../passport-sqrl/SqrlUrlFactory';
+import { SqrlUrlFactory, toSqrlBase64, trimEqualsChars } from '../passport-sqrl';
 
 describe('SqrlUrlFactory', () => {
   describe('StaticUrlCreationChecks', () => {

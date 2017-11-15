@@ -1,5 +1,5 @@
 # Passport-SQRL
-A [PassportJS](https://github.com/jaredhanson/passport) implementation of the [SQRL authentication protocol](https://www.grc.com/sqrl/sqrl.htm).
+An [ExpressJS](http://expressjs.com/) and [PassportJS](https://github.com/jaredhanson/passport) implementation of the [SQRL authentication protocol](https://www.grc.com/sqrl/sqrl.htm).
 
 ```diff
 - NOTE: This repo is under construction.
@@ -7,6 +7,9 @@ A [PassportJS](https://github.com/jaredhanson/passport) implementation of the [S
 ```
 
 The code for this repo is written in TypeScript, with the JavaScript outputs transcoded to ES6 for modern Node.js compatibility. The resulting output is published as an NPM module 'passport-sqrl'.
+
+# Using the Package
+
 
 # Using This Repo - Windows
 
@@ -22,7 +25,7 @@ The code for this repo is written in TypeScript, with the JavaScript outputs tra
 * Submit pull requests on GitHub at https://github.com/erikma/passport-sqrl
 
 ## Building code
-We use Gulp (https://gulpjs.org/) as a build system. We have integrated Gulp into Visual Studio Code to make life easier. To run a build, press `Ctrl+Shift+B` and ensure you have no errors showing in VSCode.
+We use [Gulp](https://gulpjs.org/) as a build system. We have integrated Gulp into Visual Studio Code to make life easier. To run a build, press `Ctrl+Shift+B` and ensure you have no errors showing in VSCode.
 
 Building the code places the results into the out/ folder.
 
@@ -39,21 +42,26 @@ You'll need to be on a network for these to work. (Running in airplane mode will
 ## Browser testing
 The same NodeJS + Express + Passport + passport-sqrl web site can be run from VSCode. It uses HTTPS on port 5858.
 
-To run the site:
+### Optional cert trust - Windows
+The test site uses a certificate chain generated in a custom Certificate Authority under the src\Certs directory. It includes a root, intermediate, and leaf cert. The site uses the leaf as its HTTPS identity. To allow Microsoft Edge and Google Chrome trust the site's cert chain, add the certs to your personal cert trust store:
+
+1. Right-click src\Certs\RootCert.Cert.cer, click Install Certificate, Current User, select custom store option and Trusted Root Certification Authorities 
+1. Right-click src\Certs\TestSiteIntermediate.Cert.cer, click Install Certificate, Current User, select custom store option and Intermediate Certification Authorities
+
+Note this will not establish a trust for Firefox, which uses its own custom cert trust store.
+
+### To run the site
 
 1. Press the F5 key while in VSCode.
-1. If a warning bar about build errors appears, click Debug Anyway
 1. If a firewall popup appears, allow Node.js to open port 5858
 1. Wait for the orange debugging color to appear in the status bar.
 
 Then:
 
 1. Open a browser and navigate to https://your-machine-name:5858
-1. Allow a security exception for the self-signed certificate.
-1. You should be redirected to the /login page and see a SQRL QR-Code that can also be clicked.
+1. Allow a security exception for the certificate (if needed).
+1. You should be redirected to the /login page and see a SQRL QR-Code that can be clicked or snapshotted from a phone app.
 1. When clicked, the desktop SQRL client should activate to handle the sqrl:// URL and allow you to log in.
-
-'''NOTE: Desktop flow is broken because of the self-signed certificate'''
 
 ## Useful Links
 

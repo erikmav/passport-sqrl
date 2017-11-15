@@ -1,12 +1,12 @@
-// Main Strategy module for passport-sqrl
+// Main module for passport-sqrl
 
 import base64url from 'base64url';
 import * as crypto from 'crypto';
+import * as ed25519 from 'ed25519';
 import * as express from 'express';
 import { AuthenticateOptions } from 'passport';
 import { Strategy } from 'passport-strategy';
-import { SqrlBodyParser } from './SqrlBodyParser';
-import { SqrlUrlFactory } from './SqrlUrlFactory';
+import * as urlLib from 'url';
 
 // TODO: Support default implementation of encrypted nut and support TIFFlags.IPAddressesMatch
 // TODO: Support disable, enable, remove
@@ -350,7 +350,7 @@ export class SQRLExpress {
       params = req.params;  // Allow GET calls with URL params.
     }
 
-    let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseAndValidateRequestFields(params);
+    let clientRequestInfo: ClientRequestInfo = BodyParser.parseAndValidateRequestFields(params);
     if (clientRequestInfo.protocolVersion !== 1) {
       throw new ClientInputError(`This server only handles SQRL protocol revision 1`);
     }
@@ -743,5 +743,269 @@ export class ClientInputError extends Error {
   constructor(message: string, httpStatusCode: number = 400) {
     super(message);
     this.httpStatusCode = httpStatusCode;
+  }
+}
+
+/** Parses and verifies the various parts of SQRL requests. Public for unit testing. */
+export class BodyParser {
+  /** Reverses base64url encoding then parses the expected CRLF separated fields. */
+  public static parseBase64CRLFSeparatedFields(base64Props: string): any {
+    let preSplit: string = base64url.decode(base64Props);
+    return BodyParser.parseCRLFSeparatedFields(preSplit);
+  }
+
+  public static parseCRLFSeparatedFields(preSplitLines: string): any {
+    // The body is a base64url-encoded string that, when decoded, is a set of
+    // name-value pairs separated by CRLF pairs (see https://www.grc.com/sqrl/protocol.htm).
+    let lines: string[] = preSplitLines.split('\r\n');
+    
+    let props: any = {};
+    lines.forEach(line => {
+      line = line.trim();
+      if (line.length === 0) {
+        return;
+      }
+      // The name is considered everything up to the first = sign; the value everything after.
+      let eqIndex = line.indexOf('=');
+      if (eqIndex < 1) {
+        throw new Error(`Failure parsing response line - no equal sign found in: ${line}`);
+      }
+      let name = line.substring(0, eqIndex);
+      let val = line.substring(eqIndex + 1);
+      props[name] = val;
+    });
+    return props;    
+  }
+
+  /**
+   * Parses the various POST body or GET URL parameter components passed from a SQRL client,
+   * and validates that the client-provided signatures match.
+   * 
+   * The fields can include (from the SQRL spec):
+   * client: The 'client' string provided by the client, containing a
+   *   base64url-encoded set of name-value pairs.
+   * server: The 'server' string provided by the client, either a base64url form of a
+   *   SQRL URL presented to the client, or the base64url-encoded body of a response
+   *   from a previous API call.
+   * idSignature The 'ids' string provided by the client, containing a base64url encoding of
+   *   the 512-bit signature of the UTF-8 concatenation of the client and server strings, signed using the
+   *   primary identity private key of the client for this server's domain.
+   * prevIDSignatures Zero or more 'pids' string(s) provided by the client containing base64url encoded
+   *   512-bit signatures of the UTF-8 concatenation of the client and server strings, signed using the
+   *   corresponding private keys of the deprecated "previous IDs."
+   * unlockRequestSignature An optional 'urs' string provided by the client, containing a base64url
+   *   encoding of the 512-bit signature of the UTF-8 concatenation of the client and server strings,
+   *   signed using the private Unlock Request Signing Key. The web server uses this The presence of this field and the corresponding
+   */
+  public static parseAndValidateRequestFields(params: any): ClientRequestInfo {
+    if (!params) {
+      throw new ClientInputError("Body is required");
+    }
+    if (!params.client) {
+      throw new ClientInputError("Client field is required");
+    }
+    if (!params.server) {
+      throw new ClientInputError("Server field is required");
+    }
+
+    let clientProps = BodyParser.parseBase64CRLFSeparatedFields(params.client);
+    let requestInfo = <ClientRequestInfo> {
+      protocolVersion: Number(clientProps.ver),
+      sqrlCommand: clientProps.cmd,
+      primaryIdentityPublicKey: clientProps.idk,
+      previousIdentityPublicKey: clientProps.pidk,
+      serverUnlockPublicKey: clientProps.suk,
+      serverVerifyUnlockPublicKey: clientProps.vuk,
+      indexSecret: clientProps.ins,
+      previousIndexSecret: clientProps.pins,
+    };
+    if (!requestInfo.primaryIdentityPublicKey) {
+      throw new ClientInputError('Missing primary identity public key field in SQRL request');
+    }
+    if (!params.ids) {
+      throw new ClientInputError('Missing ids= primary key signature field in SQRL request');
+    }
+
+    // Verify the client's primary and optional previous signatures versus the
+    // client+server combined data.
+    let clientServer = Buffer.from(params.client + params.server, 'utf8');
+    let primaryKeySignature = Buffer.from(params.ids, 'base64');
+    let primaryPublicKey = Buffer.from(requestInfo.primaryIdentityPublicKey, 'base64');
+    let primaryOK = ed25519.Verify(clientServer, primaryKeySignature, primaryPublicKey);
+    if (!primaryOK) {
+      throw new ClientInputError('Primary public key did not verify correctly');
+    }
+    let previousOK = true;
+    if (requestInfo.previousIdentityPublicKey) {
+      if (!params.pids) {
+        throw new ClientInputError('Missing pids= previous key signature field where the pidk= previous public key is specified');
+      }
+      let previousKeySignature = Buffer.from(params.pids, 'base64');
+      let previousPublicKey = Buffer.from(requestInfo.previousIdentityPublicKey, 'base64');
+      previousOK = ed25519.Verify(clientServer, previousKeySignature, previousPublicKey);
+      if (!previousOK) {
+        throw new ClientInputError('Previous public key did not verify correctly');
+      }
+    }
+
+    // Decode the server= fields and verify a nut is present, and promote into the result.
+    let serverDecoded = base64url.decode(params.server);
+    if (serverDecoded.startsWith('sqrl')) {
+      let qrCodeUrl: urlLib.Url = urlLib.parse(serverDecoded, /*parseQueryString:*/true);
+      requestInfo.nut = qrCodeUrl.query.nut;
+    } else {
+      let serverProps = BodyParser.parseBase64CRLFSeparatedFields(params.server);
+      requestInfo.nut = serverProps.nut;
+    }
+    if (!requestInfo.nut) {
+      throw new ClientInputError('server= info from client is not either a QR-code URL with nut= query param or a server response with nut= field');
+    }
+
+    if (clientProps.opt) {
+      let optFields: string[] = clientProps.opt.toString().split('~');
+      optFields.forEach(opt => {
+        switch (opt) {
+          case 'sqrlonly':
+            requestInfo.useSqrlIdentityOnly = true;
+            break;
+          case 'hardlock':
+            requestInfo.hardLockSqrlUse = true;
+            break;
+          case 'cps':
+            requestInfo.clientProvidedSession = true;
+            break;
+          case 'suk':
+            requestInfo.returnSessionUnlockKey = true;
+            break;
+          default:
+            throw new ClientInputError(`Unknown SQRL client option ${opt}`);
+        }
+      });
+    }
+
+    return requestInfo;
+  }
+}
+
+/**
+ * Converts the bytes in the buffer to base64url and trims trailing '='
+ * characters per the SQRL specification. Public for unit testing.
+ */
+export function toSqrlBase64(buf: Buffer): string {
+  return trimEqualsChars(buf.toString('base64'));
+}
+
+/** Trims any tail '=' characters, returning the trimmed string. Public for unit testing. */
+export function trimEqualsChars(s: string): string {
+  // Avoid regular expressions - low performance.
+  let len = s.length;
+  if (!s || len === 0) {
+    return s;
+  }
+
+  let i = len - 1;
+  while (i >= 0) {
+    if (s[i] === '=') {
+      i--;
+    } else {
+      break;
+    }
+  }
+
+  return s.substring(0, i + 1);
+}
+
+/**
+ * Creates SQRL URLs. The static methods may be used directly, or else an instance
+ * of this class may be instantiated with configuration information to reduce
+ * the number of parameters a caller has to pass.
+ */
+export class SqrlUrlFactory {
+  /**
+   * Creates a SQRL URL from full "nut" metadata.
+   * @param domain The site domain, e.g. "www.foo.com"
+   * @param serverNut The opaque, unique server data generated for this URL, passed as the nut= query parameter.
+   * @param pathString Optional path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
+   * @param domainExtension When positive, specifies the value to place into the x= query parameter that tells the client how many characters of the pathString to include in its server key hash.
+   */
+  public static create(
+      domain: string,
+      serverNut: string | Buffer,
+      port?: number,
+      pathString?: string,
+      domainExtension?: number)
+      : string {
+    let portPart = port ? `:${port}` : '';
+
+    if (!pathString) {
+      pathString = '';
+    }
+
+    if (pathString.length > 0 && pathString[0] !== '/') {
+      pathString = '/' + pathString;
+    }
+
+    if (pathString.endsWith('?')) {
+      pathString = pathString.substring(0, pathString.length - 1);
+    }
+
+    // domainExt includes the starting / of the path; start calculating after pathString has that prefix.
+    let domainExt = '';
+    if (pathString.length > 0 && domainExtension && domainExtension > 0) {
+      domainExtension = Math.min(domainExtension, pathString.length);
+      domainExt = `&x=${domainExtension}`;
+    }
+
+    let nut: string = SqrlUrlFactory.nutToString(serverNut);
+
+    return `sqrl://${domain}${portPart}${pathString}?nut=${nut}${domainExt}`;
+  }
+
+  public static nutToString(nut: string | Buffer): string {
+    let nutStr: string;
+    if (nut instanceof Buffer) {
+      nutStr = toSqrlBase64(nut);
+    } else {
+      nutStr = nut;
+    }
+    return nutStr;    
+  }
+
+  private domain: string;
+  private port: number | undefined;
+  private pathString: string | undefined;
+  private domainExtension?: number;
+  
+  /**
+   * Creates a SQRL URL factory with static configuration information.
+   * @param domain The site domain, e.g. "www.foo.com"
+   * @param port Optional port.
+   * @param pathString Optional path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
+   * @param domainExtension When positive, specifies the value to place into the x= query parameter
+   *   that tells the client how many characters of the pathString to include in its server key hash.
+   */
+  constructor(domain: string, port?: number, pathString?: string, domainExtension?: number) {
+    this.domain = domain;
+    this.port = port;
+    this.pathString = pathString;
+    this.domainExtension = domainExtension;
+  }
+
+  /**
+   * Creates a SQRL URL from the provided unique server data.
+   * @param serverNut The opaque, unique server data generated for this URL, passed as the nut= query parameter.
+   * @param pathString Optional path string, e.g. "path/to/sqrlLogin". May start with a forward slash.
+   *   Overrides any path specified in the constructor.
+   * @param domainExtension When positive, specifies the value to place into the x= query parameter
+   *   that tells the client how many characters of the pathString to include in its server key hash.
+   *   Overrides any value specified in the constructor.
+   */
+  public create(serverNut: string | Buffer, pathString?: string, domainExtension?: number): string {
+    return SqrlUrlFactory.create(
+        this.domain,
+        serverNut,
+        this.port,
+        pathString || this.pathString,
+        domainExtension || this.domainExtension);
   }
 }

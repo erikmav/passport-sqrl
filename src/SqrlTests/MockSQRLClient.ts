@@ -6,8 +6,7 @@ import * as fs from 'fs';
 import * as request from 'request';
 import * as requestPromise from 'request-promise-native';
 import * as url from 'url';
-import { ClientRequestInfo, TIFFlags } from '../passport-sqrl';
-import { SqrlBodyParser } from '../passport-sqrl/SqrlBodyParser';
+import { BodyParser, ClientRequestInfo, TIFFlags } from '../passport-sqrl';
 
 const serverTlsCertDir = __dirname;
 const serverTlsCaChain = serverTlsCertDir + "/TestSite.FullChain.Cert.pem";
@@ -191,7 +190,7 @@ export class MockSQRLClient {
    * prepare the client for the next call.
    */
   public parseServerBody(body: string): ServerResponseInfo {
-    let props = SqrlBodyParser.parseBase64CRLFSeparatedFields(body);
+    let props = BodyParser.parseBase64CRLFSeparatedFields(body);
 
     let vers: string[] = props.ver.split(',');
     let supportedVersions: number[] = [];
@@ -369,7 +368,7 @@ describe('SQRLClient', () => {
       assert.isFalse(!bodyFields.client);
       assert.isFalse(!bodyFields.server);
 
-      let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseAndValidateRequestFields(bodyFields);
+      let clientRequestInfo: ClientRequestInfo = BodyParser.parseAndValidateRequestFields(bodyFields);
 
       assert.equal('query', clientRequestInfo.sqrlCommand);
       // TODO: Check other fields
