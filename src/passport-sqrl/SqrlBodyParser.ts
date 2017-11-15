@@ -1,7 +1,7 @@
 import base64url from 'base64url';
 import * as ed25519 from 'ed25519';
 import * as url from 'url';
-import { ClientRequestInfo } from './index';
+import { ClientInputError, ClientRequestInfo } from './index';
 
 /** Parses and verifies the various parts of SQRL requests. */
 export class SqrlBodyParser {
@@ -56,13 +56,13 @@ export class SqrlBodyParser {
    */
   public static parseAndValidateRequestFields(params: any): ClientRequestInfo {
     if (!params) {
-      throw new Error("Body is required");
+      throw new ClientInputError("Body is required");
     }
     if (!params.client) {
-      throw new Error("Client field is required");
+      throw new ClientInputError("Client field is required");
     }
     if (!params.server) {
-      throw new Error("Server field is required");
+      throw new ClientInputError("Server field is required");
     }
 
     let clientProps = SqrlBodyParser.parseBase64CRLFSeparatedFields(params.client);
@@ -77,10 +77,10 @@ export class SqrlBodyParser {
       previousIndexSecret: clientProps.pins,
     };
     if (!requestInfo.primaryIdentityPublicKey) {
-      throw new Error('Missing primary identity public key field in SQRL request');
+      throw new ClientInputError('Missing primary identity public key field in SQRL request');
     }
     if (!params.ids) {
-      throw new Error('Missing ids= primary key signature field in SQRL request');
+      throw new ClientInputError('Missing ids= primary key signature field in SQRL request');
     }
 
     // Verify the client's primary and optional previous signatures versus the
@@ -90,18 +90,18 @@ export class SqrlBodyParser {
     let primaryPublicKey = Buffer.from(requestInfo.primaryIdentityPublicKey, 'base64');
     let primaryOK = ed25519.Verify(clientServer, primaryKeySignature, primaryPublicKey);
     if (!primaryOK) {
-      throw new Error('Primary public key did not verify correctly');
+      throw new ClientInputError('Primary public key did not verify correctly');
     }
     let previousOK = true;
     if (requestInfo.previousIdentityPublicKey) {
       if (!params.pids) {
-        throw new Error('Missing pids= previous key signature field where the pidk= previous public key is specified');
+        throw new ClientInputError('Missing pids= previous key signature field where the pidk= previous public key is specified');
       }
       let previousKeySignature = Buffer.from(params.pids, 'base64');
       let previousPublicKey = Buffer.from(requestInfo.previousIdentityPublicKey, 'base64');
       previousOK = ed25519.Verify(clientServer, previousKeySignature, previousPublicKey);
       if (!previousOK) {
-        throw new Error('Previous public key did not verify correctly');
+        throw new ClientInputError('Previous public key did not verify correctly');
       }
     }
 
@@ -115,7 +115,7 @@ export class SqrlBodyParser {
       requestInfo.nut = serverProps.nut;
     }
     if (!requestInfo.nut) {
-      throw new Error('server= info from client is not either a QR-code URL with nut= query param or a server response with nut= field');
+      throw new ClientInputError('server= info from client is not either a QR-code URL with nut= query param or a server response with nut= field');
     }
 
     if (clientProps.opt) {
@@ -135,7 +135,7 @@ export class SqrlBodyParser {
             requestInfo.returnSessionUnlockKey = true;
             break;
           default:
-            throw new Error(`Unknown SQRL client option ${opt}`);
+            throw new ClientInputError(`Unknown SQRL client option ${opt}`);
         }
       });
     }

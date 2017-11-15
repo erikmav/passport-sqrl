@@ -8,10 +8,10 @@ import { Strategy } from 'passport-strategy';
 import { SqrlBodyParser } from './SqrlBodyParser';
 import { SqrlUrlFactory } from './SqrlUrlFactory';
 
-// TODO: Unit test for made-up nut values (attacker client).
-// TODO: Unit test for incorrect client URL - attack by client making things up
-// TODO: Unit tests for missing client fields - bad client or attack
 // TODO: Support default implementation of encrypted nut and support TIFFlags.IPAddressesMatch
+// TODO: Support disable, enable, remove
+// TODO: Support suk client request and server validation
+// TODO: Add urs= field
 
 /** Definitions for the Transaction Information Flag values specified in the SQRL specification. */
 export enum TIFFlags {
@@ -312,9 +312,10 @@ export class SQRLExpress {
         res.statusCode = authResult.httpResponseCode;
         res.send(authResult.body);
       })
-      .catch(err => {
-        this.log.error(`Error thrown from SQRL API call: ${err}`);
-        // TODO: Can we differentiate transient versus nontransient errors?
+      .catch(e => {
+        let err = <ClientInputError> e;  // Cast to commonly thrown error - if not correct, its httpStatusCode will be undefined.
+        this.log.error(`Error thrown from SQRL API call: ${err} httpStatusCode=${err.httpStatusCode}`);
+
         // tslint:disable-next-line:no-bitwise
         let tif: TIFFlags = TIFFlags.CommandFailed | TIFFlags.TransientError;
 
@@ -333,7 +334,7 @@ export class SQRLExpress {
         let resp = serverLines.join("\r\n") + "\r\n";  // Last line must have CRLF as well.
         resp = base64url.encode(resp);
 
-        res.statusCode = 500;
+        res.statusCode = err.httpStatusCode || 500;
         res.send(resp);
       });
   }
@@ -351,7 +352,7 @@ export class SQRLExpress {
 
     let clientRequestInfo: ClientRequestInfo = SqrlBodyParser.parseAndValidateRequestFields(params);
     if (clientRequestInfo.protocolVersion !== 1) {
-      throw new Error(`This server only handles SQRL protocol revision 1`);
+      throw new ClientInputError(`This server only handles SQRL protocol revision 1`);
     }
     let nutInfoPromise: Promise<NutInfo | null> = this.identityStorage.getNutInfoAsync(clientRequestInfo.nut);
 
@@ -362,7 +363,7 @@ export class SQRLExpress {
 
     let nutInfo: NutInfo | null = await nutInfoPromise;
     if (!nutInfo) {
-      throw new Error('Client presented unknown nut value');
+      throw new ClientInputError('Client presented unknown nut value');
     }
 
     await this.identityStorage.nutIssuedToClientAsync(urlAndNut, nutInfo.originalLoginNut || nutInfo.nut);
@@ -394,7 +395,7 @@ export class SQRLExpress {
         authCompletion = await this.identityStorage.remove(clientRequestInfo, nutInfo);
         break;
       default:
-        throw new Error(`Unknown SQRL command ${clientRequestInfo.sqrlCommand}`);
+        throw new ClientInputError(`Unknown SQRL command ${clientRequestInfo.sqrlCommand}`);
     }
 
     this.log.debug(`Auth completion info: ${this.objToString(authCompletion)}`);
@@ -419,7 +420,7 @@ export class SQRLExpress {
     // Per SQRL protocol, the name-value pairs below will be joined in the same order
     // with CR and LF characters, then base64url encoded.
     let serverLines: string[] = [
-      'ver=1',  // Suported versions list
+      'ver=1',  // Supported versions list
       'nut=' + clientRequestInfo.nextNut,
       'tif=' + (authInfo.tifValues || 0).toString(16),
       'qry=' + this.config.urlPath + '?nut=' + clientRequestInfo.nextNut,
@@ -733,4 +734,14 @@ export class NutInfo {
   
   /** The nut value from an original QR code, for backtracking from this later nut. */
   public originalLoginNut?: string;
+}
+
+/** Error subclass that adds an HTTP status code. */
+export class ClientInputError extends Error {
+  public httpStatusCode: number;
+
+  constructor(message: string, httpStatusCode: number = 400) {
+    super(message);
+    this.httpStatusCode = httpStatusCode;
+  }
 }

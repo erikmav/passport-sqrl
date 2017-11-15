@@ -2,7 +2,7 @@
 
 import { assert } from "chai";
 import * as express from 'express';
-import { AuthCallback, AuthCompletionInfo, AuthenticateAsyncResult, ClientRequestInfo, ILogger, ISQRLIdentityStorage, NutInfo, SQRLExpress, SQRLStrategyConfig, TIFFlags, UrlAndNut } from '../passport-sqrl';
+import { AuthCallback, AuthCompletionInfo, AuthenticateAsyncResult, ClientInputError, ClientRequestInfo, ILogger, ISQRLIdentityStorage, NutInfo, SQRLExpress, SQRLStrategyConfig, TIFFlags, UrlAndNut } from '../passport-sqrl';
 import { MockLogger } from '../SqrlTests/MockLogger';
 import { MockSQRLClient, ServerResponseInfo } from './MockSqrlClient';
 
@@ -139,8 +139,154 @@ describe('SQRLExpress', () => {
         });
         assert.fail('Expected exception not thrown');
       } catch (e) {
-        let err = <Error> e;
+        let err = <ClientInputError> e;
         assert.isTrue(err.message.indexOf('This server only handles SQRL protocol revision 1') >= 0);
+        assert.equal(400, err.httpStatusCode);
+      }
+    });
+  });
+
+  describe('queryUnknownNutFails', () => {
+    it('should throw if the nut presented to an API call is unknown', async () => {
+      let storage = new MockSQRLIdentityStorage();
+      let sqrl = new MockSQRLExpress(storage, new MockLogger(), <SQRLStrategyConfig> {
+          localDomainName: 'domain.com',
+        });
+
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=UNKNOWN');
+      try {
+        let authResult: AuthenticateAsyncResult = await sqrl.authenticateAsync(<express.Request> {
+          method: "POST",
+          body: client.generatePostBody('query')
+        });
+        assert.fail('Expected exception not thrown');
+      } catch (e) {
+        let err = <ClientInputError> e;
+        assert.isTrue(err.message.indexOf('unknown nut value') >= 0, err.message);
+        assert.equal(400, err.httpStatusCode);
+      }
+    });
+  });
+
+  describe('queryMissingVersionFails', () => {
+    it('should throw if the client request does not have ver=', async () => {
+      let sqrl = new MockSQRLExpress(new MockSQRLIdentityStorage(), new MockLogger(), <SQRLStrategyConfig> {});
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=UNKNOWN');
+      client.omitVersion = true;
+      try {
+        let authResult: AuthenticateAsyncResult = await sqrl.authenticateAsync(<express.Request> {
+          method: "POST",
+          body: client.generatePostBody('query')
+        });
+        assert.fail('Expected exception not thrown');
+      } catch (e) {
+        let err = <ClientInputError> e;
+        assert.isTrue(err.message.indexOf('This server only handles SQRL protocol revision 1') >= 0, err.message);
+        assert.equal(400, err.httpStatusCode);
+      }
+    });
+  });
+
+  describe('callMissingCommandFails', () => {
+    it('should throw if the client request does not have cmd=', async () => {
+      let storage = new MockSQRLIdentityStorage();
+      storage.onGetNutInfo = (nut: string): NutInfo | null => <NutInfo> { nut: '1234' };
+
+      let sqrl = new MockSQRLExpress(storage, new MockLogger(), <SQRLStrategyConfig> {});
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=1234');
+      client.omitCommand = true;
+      try {
+        let authResult: AuthenticateAsyncResult = await sqrl.authenticateAsync(<express.Request> {
+          method: "POST",
+          body: client.generatePostBody('query')
+        });
+        assert.fail('Expected exception not thrown');
+      } catch (e) {
+        let err = <ClientInputError> e;
+        assert.isTrue(err.message.indexOf('Unknown SQRL command') >= 0, err.message);
+        assert.equal(400, err.httpStatusCode);
+      }
+    });
+  });
+
+  describe('callMissingIDKeyFails', () => {
+    it('should throw if the client request does not have idk=', async () => {
+      let storage = new MockSQRLIdentityStorage();
+      // storage.onGetNutInfo = (nut: string): NutInfo | null => <NutInfo> { nut: '1234' };
+
+      let sqrl = new MockSQRLExpress(storage, new MockLogger(), <SQRLStrategyConfig> {});
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=1234');
+      client.omitIDKey = true;
+      try {
+        let authResult: AuthenticateAsyncResult = await sqrl.authenticateAsync(<express.Request> {
+          method: "POST",
+          body: client.generatePostBody('query')
+        });
+        assert.fail('Expected exception not thrown');
+      } catch (e) {
+        let err = <ClientInputError> e;
+        assert.isTrue(err.message.indexOf('Missing primary identity public key field in SQRL request') >= 0, err.message);
+        assert.equal(400, err.httpStatusCode);
+      }
+    });
+  });
+
+  describe('callMissingPrimarySignatureFails', () => {
+    it('should throw if the client request does not have ids=', async () => {
+      let storage = new MockSQRLIdentityStorage();
+      let sqrl = new MockSQRLExpress(storage, new MockLogger(), <SQRLStrategyConfig> {});
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=1234');
+      client.omitPrimarySignature = true;
+      try {
+        let authResult: AuthenticateAsyncResult = await sqrl.authenticateAsync(<express.Request> {
+          method: "POST",
+          body: client.generatePostBody('query')
+        });
+        assert.fail('Expected exception not thrown');
+      } catch (e) {
+        let err = <ClientInputError> e;
+        assert.isTrue(err.message.indexOf('Missing ids= primary key signature field in SQRL request') >= 0, err.message);
+        assert.equal(400, err.httpStatusCode);
+     }
+    });
+  });
+
+  describe('callMissingClientFieldFails', () => {
+    it('should throw if the client request does not have client=', async () => {
+      let storage = new MockSQRLIdentityStorage();
+      let sqrl = new MockSQRLExpress(storage, new MockLogger(), <SQRLStrategyConfig> {});
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=1234');
+      client.omitClient = true;
+      try {
+        let authResult: AuthenticateAsyncResult = await sqrl.authenticateAsync(<express.Request> {
+          method: "POST",
+          body: client.generatePostBody('query')
+        });
+        assert.fail('Expected exception not thrown');
+      } catch (e) {
+        let err = <ClientInputError> e;
+        assert.isTrue(err.message.indexOf('Client field is required') >= 0, err.message);
+        assert.equal(400, err.httpStatusCode);
+      }
+    });
+  });
+
+  describe('callMissingServerFieldFails', () => {
+    it('should throw if the client request does not have server=', async () => {
+      let storage = new MockSQRLIdentityStorage();
+      let sqrl = new MockSQRLExpress(storage, new MockLogger(), <SQRLStrategyConfig> {});
+      let client = new MockSQRLClient('sqrl://foo.com/login?nut=1234');
+      client.omitServer = true;
+      try {
+        let authResult: AuthenticateAsyncResult = await sqrl.authenticateAsync(<express.Request> {
+          method: "POST",
+          body: client.generatePostBody('query')
+        });
+        assert.fail('Expected exception not thrown');
+      } catch (e) {
+        let err = <ClientInputError> e;
+        assert.isTrue(err.message.indexOf('Server field is required') >= 0, err.message);
+        assert.equal(400, err.httpStatusCode);
       }
     });
   });

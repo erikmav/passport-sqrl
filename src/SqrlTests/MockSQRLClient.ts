@@ -52,6 +52,14 @@ export class MockSQRLClient {
   public previousIdentityPublicKeys: Buffer[] = [];
   public lastQueryPrevIdTried: number = -1;
   public serverReturnedSessionUnlockKey: Buffer | undefined;
+
+  // Malformed request injection flags
+  public omitVersion: boolean;
+  public omitCommand: boolean;
+  public omitIDKey: boolean;
+  public omitPrimarySignature: boolean;
+  public omitClient: boolean;
+  public omitServer: boolean;
   
   private primaryIdentityPrivateKey: Buffer;
   private previousIdentityPrivateKeys: Buffer[] = [];
@@ -122,12 +130,18 @@ export class MockSQRLClient {
   public generatePostBody(cmd: string, primaryIdentOnly: boolean = false): RequestPostBody {
     // Per SQRL client value protocol, the name-value pairs below will be joined in the same order
     // with CR and LF characters, then base64url encoded.
-    let clientLines: string[] = [
-      `ver=${this.sqrlVersion}`,
-      `cmd=${cmd}`,
-      'idk=' + base64url.encode(this.primaryIdentityPublicKey)
-      // TODO: Add Server Unlock Key, and cases for Server Verify Unlock key
-    ];
+    let clientLines: string[] = [];
+
+    if (!this.omitVersion) {
+      clientLines.push(`ver=${this.sqrlVersion}`);
+    }
+    if (!this.omitCommand) {
+      clientLines.push(`cmd=${cmd}`);
+    }
+    if (!this.omitIDKey) {
+      clientLines.push('idk=' + base64url.encode(this.primaryIdentityPublicKey));
+    }
+    // TODO: Add Server Unlock Key, and cases for Server Verify Unlock key
 
     if (!primaryIdentOnly && this.previousIdentityPublicKeys.length > 0) {
       this.lastQueryPrevIdTried = (this.lastQueryPrevIdTried + 1) % this.previousIdentityPublicKeys.length;
@@ -159,9 +173,9 @@ export class MockSQRLClient {
     let clientServerSignature = ed25519.Sign(clientServer, this.primaryIdentityPrivateKey);
 
     let result = <RequestPostBody> {
-      client: client,
-      server: server,
-      ids: base64url.encode(clientServerSignature),
+      client: this.omitClient ? undefined : client,
+      server: this.omitServer ? undefined : server,
+      ids: this.omitPrimarySignature ? undefined : base64url.encode(clientServerSignature),
     };
 
     if (!primaryIdentOnly && this.previousIdentityPublicKeys.length > 0) {
