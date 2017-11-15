@@ -74,7 +74,7 @@ var Paths = {
 // ---------------------------------------------------------------------------
 gulp.task('default', [
   'clean',
-    
+
   'tslint',
   'transpile-main-package',
   'transpile-sqrl-tests',
@@ -89,6 +89,7 @@ gulp.task('default', [
   'run-test-site-integration-tests',
 
   'copy-package-json',
+  'copy-package-readme',
 ]);
 gulp.task('build', ['default']);
 
@@ -119,6 +120,11 @@ gulp.task('copy-package-json', [], () => {
   return gulp.src('./package.json')
       // By convention, dependencies are those for passport-sqrl/index.ts, devDependencies for testing.
       .pipe(jsonModify({ key: 'devDependencies', value: {} }))
+      .pipe(gulp.dest(Paths.PackageOutput));
+});
+gulp.task('copy-package-readme', [], () => {
+  // The repo's README.md is used for the package.
+  return gulp.src('./README.md')
       .pipe(gulp.dest(Paths.PackageOutput));
 });
 
