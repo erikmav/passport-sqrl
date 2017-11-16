@@ -1,7 +1,7 @@
 # Passport-SQRL
 An [ExpressJS](http://expressjs.com/) and [PassportJS](https://github.com/jaredhanson/passport) implementation of the [SQRL authentication protocol](https://www.grc.com/sqrl/sqrl.htm).
 
-The code for this repo is written in TypeScript, with the JavaScript outputs transcoded to ES6 for modern Node.js compatibility. The resulting output is published as an NPM module 'passport-sqrl'.
+The code is written in TypeScript, with the transcoded JavaScript outputs targeted to ES6 for modern Node.js compatibility. The resulting output is published as NPM module 'passport-sqrl'.
 
 # Using the Package
 SQRL does not present its credentials in the HTTP Authenticate header, and so requires several integration points in a site:
@@ -11,7 +11,7 @@ SQRL does not present its credentials in the HTTP Authenticate header, and so re
 1. The site must implement an ISQRLIdentityStorage implementation to store user profile information and SQRL "nut" mappings for use by the passport-sqrl components.
 1. For best effect, the site's login page should poll for login completion to handle the SQRL app case, e.g. phone login or the separate SQRL desktop app. Because the app data flow does not integrate with the user's browser (by design - the phone login case is important for insecure Internet cafe scenarios), the browser will not be able to tell when the login has been completed - and get an ambient auth cookie - without polling the site.
 
-The demo site code in the passport-sqrl Git repo (https://github.com/erikma/passport-sqrl/tree/master/src/testSite especially TestSiteHandler.ts) demonstrates the integration steps above. See the section below on using the test site for browser testing.
+The demo site code in the passport-sqrl Git repo (https://github.com/erikma/passport-sqrl/tree/master/src/testSite especially TestSiteHandler.ts and login.ejs) demonstrates the integration steps above. See the section below on using the test site for browser testing.
 
 # Release History and Release Notes
 
@@ -52,6 +52,8 @@ There is a suite of tests that start up a Node server with Express, Passport, an
 
 You'll need to be on a network for these to work. (Running in airplane mode will cause failures. But many flights have wifi. :)
 
+The integration tests also make use of a mock SQRL client that knows how to run the client side of the protocol. This could be useful in its own right if you want to extract it for general purpose use in a JavaScript based client environment.
+
 ## Browser Testing with the Test Site
 The same NodeJS + Express + Passport + passport-sqrl web site can be run from VSCode. It uses HTTPS on port 5858.
 
@@ -71,7 +73,7 @@ Note this will not establish a trust for Firefox, which uses its own custom cert
 
 ### Testing with a Browser
 
-1. Open a browser and navigate to https://your-machine-name:5858
+1. Open a browser and navigate to https://your-machine-IP:5858
 1. Allow a security exception for the certificate (if needed).
 1. You should be redirected to the /login page and see a SQRL QR-Code that can be clicked to launch the desktop app, or snapshotted from a phone app.
 1. When clicked, the desktop SQRL client should activate to handle the sqrl:// URL and allow you to log in.

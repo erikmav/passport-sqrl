@@ -14,10 +14,19 @@
   },
   "keywords": [
     "sqrl",
+    "secure",
+    "quick",
+    "reliable",
+    "login",
+    "authenticate",
+    "authentication",
+    "phone",
+    "qr",
+    "qr-code",
+    "express",
+    "expressjs",
     "passport",
-    "passportjs",
-    "nodejs",
-    "node"
+    "passportjs"
   ],
   "main": "./index.js",
   "types": "./index.d.ts",
