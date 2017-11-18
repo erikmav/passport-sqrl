@@ -55,15 +55,12 @@ You'll need to be on a network for these to work. (Running in airplane mode will
 The integration tests also make use of a mock SQRL client that knows how to run the client side of the protocol. This could be useful in its own right if you want to extract it for general purpose use in a JavaScript based client environment.
 
 ## Browser Testing with the Test Site
-The same NodeJS + Express + Passport + passport-sqrl web site can be run from VSCode. It uses HTTPS on port 5858.
+The same NodeJS + Express + Passport + passport-sqrl web site can be run from VSCode. It uses HTTPS on port 5858 and HTTP on port 5857.
 
-### Optional cert trust - Windows
-The test site uses a certificate chain generated in a custom Certificate Authority under the src\Certs directory. It includes a root, intermediate, and leaf cert. The site uses the leaf as its HTTPS identity. To allow Microsoft Edge and Google Chrome trust the site's cert chain, add the certs to your personal cert trust store:
+### Installing the Test Site Trusted Root Certificate
+The test site uses a certificate chain generated in a custom Certificate Authority under the src\Certs directory. It includes a root, intermediate, and leaf cert. The site uses the leaf as its HTTPS identity. To allow your device's browser to trust the site's cert chain, you need to add the root certificate as a trusted certificate authority.
 
-1. Right-click src\Certs\RootCert.Cert.cer, click Install Certificate, Current User, select custom store option and Trusted Root Certification Authorities 
-1. Right-click src\Certs\TestSiteIntermediate.Cert.cer, click Install Certificate, Current User, select custom store option and Intermediate Certification Authorities
-
-Note this will not establish a trust for Firefox, which uses its own custom cert trust store.
+A small HTTP-only site is started when you build and run the test site. Navigate to http://your-machine-IP:5857 from your computer or device. (If the connection times out, check your Windows computer's firewall settings and ensure node.exe is allowed to listen on ports 5857 and 5858 for private networks.) Follow the instructions on the page to install RootCert.Cert.pem (Android) or RootCert.Cert.cer (Windows) as a trusted root.
 
 ### To Run the Site
 

@@ -1,0 +1,35 @@
+<p>
+  This is not the real site but a small HTTP-only version that serves out the
+  certificate you can install in your user trust store to allow accessing
+  the <a href="https://<%= httpsHost %>:<%= httpsPort %>/">HTTPS SQRL test site</a>.
+</p>
+<ul>
+  <li>Root certificate (Android format): <a href="/RootCert.Cert.pem">RootCert.Cert.pem</a></li>
+  <li>Root certificate (Windows format): <a href="/RootCert.Cert.cer">RootCert.Cert.cer</a></li>
+</ul>
+<p>
+  To install on Android:
+</p>
+<ol>
+  <li>Tap the root certificate link above for Android and download the cert file.</li>
+  <li>Go to Settings -> Security -> Install From SD Card, choose Downloads, and tap the RootCert.Cert.pem file.</li>
+  <li>Install the certificate into your root cert store.</li>
+</ol>
+<p>
+  NOTE: This may require you to use a PIN on your device, and Android may warn you about
+  possible traffic surveillance because of the cert. You should remove the test cert
+  when done with testing.
+</p>
+<p>
+  To install on Windows:
+</p>
+<ol>
+  <li>Tap or click the root certificate link above for Windows and download the cert file.</li>
+  <li>Open an Explorer window to your Downloads folder by tapping the Windows key on the keyboard, then type Downloads, and click the Downloads folder.</li>
+  <li>Right-click RootCert.Cert.cer, then click Install Certificate.</li>
+  <li>Choose Current User and the default option to auto-select the store.</li>
+  <li>Click Finish to install.</li>
+</ol>
+<p>
+  Note this will not establish a trust for Firefox, which uses its own custom cert trust store.
+</p>

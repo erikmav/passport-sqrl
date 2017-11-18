@@ -182,7 +182,9 @@ gulp.task('copy-test-site-static-files', [], () => {
       Paths.TestSiteRoot + '/**/*.html',
       Paths.TestSiteRoot + '/**/*.css',
       Paths.TestSiteRoot + '/**/*.ejs',
-      Paths.Certs + '/*.pem'  // Test site cert chain
+      Paths.Certs + '/*.Cert.pem',  // Test site cert chain
+      Paths.Certs + '/TestSite.PrivateKey.pem',  // Test site leaf cert key
+      Paths.Certs + '/RootCert.Cert.cer'  // Test site cert chain
     ])
     .pipe(gulp.dest(Paths.TestSiteOutput));
 });

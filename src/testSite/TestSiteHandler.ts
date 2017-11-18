@@ -19,6 +19,7 @@ import * as express from 'express';
 import * as expressLayouts from 'express-ejs-layouts';
 import * as expressSession from 'express-session';
 import * as fs from 'fs';
+import * as http from 'http';
 import * as neDB from 'nedb';
 import * as os from 'os';
 import * as passport from 'passport';
@@ -37,6 +38,12 @@ declare module 'spdy' {
   }
 }
 
+// TypeScript definitions for http do not include an overload that allows the common
+// Express app pattern as a param. Inject an overload to avoid compilation errors.
+declare module 'http' {
+  export function createServer(handler: express.Application): Server;
+}
+
 // Promisify extensions.
 declare module 'nedb' {
   class Nedb {
@@ -51,10 +58,15 @@ declare module 'nedb' {
 
 const serverTlsCertDir = __dirname;
 const serverTlsKey = serverTlsCertDir + "/TestSite.PrivateKey.pem";
-const serverTlsCert = serverTlsCertDir + "/TestSite.Cert.pem";
+
+// Root cert must be trusted on devices, but the server should serve its leaf and intermediate.
+// Particularly important for Android where the "Settings->Security->Install From SD Card"
+// only allows installing a root cert into the user trusted store. 
+const serverTlsCert = serverTlsCertDir + "/TestSite.LeafAndIntermediate.Cert.pem";
 
 export class TestSiteHandler implements ISQRLIdentityStorage {
   private testSiteServer: spdy.Server;
+  private httpCertServer: http.Server;
   private sqrlPassportStrategy: SQRLStrategy;
   private sqrlApiHandler: SQRLExpress;
   private userTable: neDB;
@@ -83,8 +95,8 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     this.sqrlApiHandler = new SQRLExpress(this, this.log, sqrlConfig);
 
     // Configure PassportJS with the SQRL Strategy. PassportJS will add the
-    // implicit res.login() method used later on. We use the SQRL primary
-    // public key as the key for the identity.
+    // implicit res.login() method used later on. We use the user's SQRL primary
+    // public key as the key for the user profile in back-end database storage.
     this.sqrlPassportStrategy = new SQRLStrategy(this.log, sqrlConfig);
     passport.use(this.sqrlPassportStrategy);
     passport.serializeUser((user: UserDBRecord, done) => done(null, user.sqrlPrimaryIdentityPublicKey));
@@ -227,10 +239,31 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     }, app);
     log.info(`Test server listening on ${sqrlConfig.localDomainName}:${port}`);
     this.testSiteServer.listen(port, sqrlConfig.localDomainName);
+
+    // Fun hack: Since we're using a custom CA cert chain, it's hard to get the root
+    // cert into the trusted store especially on phones. We expose a tiny http single page
+    // with links to the root cert for installation, and a link to the https site.
+    const httpApp = express()
+      .set('view engine', 'ejs')
+      .set('views', path.join(__dirname, 'views'))
+      .use(expressLayouts)
+      .use(favicon(webSiteDir + '/favicon.ico'))
+      .get('/', (req, res) => res.render('httpCerts', {
+        subpageName: 'HTTPS Certs',
+        httpsHost: sqrlConfig.localDomainName,
+        httpsPort: port
+      }))
+      .get('/RootCert.Cert.pem', (req, res) => res.download(__dirname + '/RootCert.Cert.pem'))
+      .get('/RootCert.Cert.cer', (req, res) => res.download(__dirname + '/RootCert.Cert.cer'));
+    this.httpCertServer = http.createServer(httpApp);
+    this.httpCertServer.listen(port - 1, sqrlConfig.localDomainName);
   }
 
   public close(): void {
     this.testSiteServer.close();
+    if (this.httpCertServer) {
+      this.httpCertServer.close();
+    }
   }
 
   // See doc comments on ISQRLIdentityStorage.nutIssuedToClientAsync().

@@ -54,6 +54,11 @@ del %FILENAME_BASE%.csr.pem
 %OPENSSL_PATH% verify -verbose -CAfile %ROOT_CERT% -untrusted %INT_CERT% %LEAF_CERT%
 if ERRORLEVEL 1 echo Validation of leaf cert failed with errorlevel %ERRORLEVEL% && exit /b 1
 
-echo Wrote private key into %LEAF_PRIV% and cert into %LEAF_CERT%
+@rem Create a cert chain of all but the root cert for TLS serving - root cert must be trusted on devices,
+@rem but the server should serve its leaf and intermediate. Particularly important for Android where the
+@rem "Settings->Security->Install From SD Card" only allows installing a root cert into the user trusted store. 
+copy /y %LEAF_CERT%+%INT_CERT% %FILENAME_BASE%.LeafAndIntermediate.Cert.pem
+
+echo Wrote private key into %LEAF_PRIV%, cert into %LEAF_CERT%, leaf+intermediate into %FILENAME_BASE%.LeafAndIntermediate.Cert.pem
 
 exit /b 0
