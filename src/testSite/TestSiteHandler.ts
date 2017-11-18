@@ -1,16 +1,16 @@
 // Module containing web site logic for the test site.
 //
-// URI space and site design notes
+// Site design notes
 //
 // Browser session cookies have been enabled for tracking the user
 // session once logged in. The back-end database is an in-memory NeDB
 // (https://github.com/louischatriot/nedb/) instance. The user
 // profile schema information is in UserDBRecord.
 //
-// Browser page URI space:
-//   / : Home page, hosted from index.ejs (template)
+// URI space:
+//   / : Home page, hosted from index.ejs (template). If not logged in, redirects to /login
 //   /login : GET for login page (login.ejs)
-//   /sqrlLogin : GET/POST API endpoint for SQRL login
+//   /sqrl : GET/POST API endpoint for SQRL API
 
 import * as bodyParser from 'body-parser';
 import * as cookieParser from 'cookie-parser';
@@ -267,11 +267,11 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
   }
 
   // See doc comments on ISQRLIdentityStorage.nutIssuedToClientAsync().
-  public async nutIssuedToClientAsync(urlAndNut: UrlAndNut, originalLoginNut?: string): Promise<void> {
+  public nutIssuedToClientAsync(urlAndNut: UrlAndNut, originalLoginNut?: string): Promise<void> {
     return (<any> this.nutTable).insertAsync(new NutDBRecord(urlAndNut.nutString, urlAndNut.url, originalLoginNut));
   }
 
-  public async getNutInfoAsync(nut: string): Promise<NutInfo | null> {
+  public getNutInfoAsync(nut: string): Promise<NutInfo | null> {
     return this.getNutRecordAsync(nut);  // NutDBRecord derives from NutInfo.
   }
 
