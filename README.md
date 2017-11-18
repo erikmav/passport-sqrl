@@ -26,7 +26,7 @@ You'll need to clone the package's home repo from https://github.com/erikma/pass
 
 ## Dev Environment Setup
 
-1. Install the latest SQRL desktop client from [GRC's site](https://www.grc.com/dev/sqrl/sqrl.exe)
+1. Install the latest SQRL desktop client from [GRC's site](https://www.grc.com/dev/sqrl.exe)
 1. Install Git from https://git-scm.com/download/win (for Windows), or https://git-scm.com/download for other operating systems. Be sure you're using at least version 2.14.1 to get an important security patch.
 1. Install Node.js from https://nodejs.org (click the Current button to get the latest - you need at least version 8.4).
 1. (Windows) Install Python version 2.7 from https://www.python.org/ . You can install just for your local user account or for all users. Version 2.7 is required for building the Ed25519 native code package.
