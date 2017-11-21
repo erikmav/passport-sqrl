@@ -28,7 +28,7 @@ You'll need to clone the package's home repo from https://github.com/erikma/pass
 
 1. Install the latest SQRL desktop client from [GRC's site](https://www.grc.com/dev/sqrl.exe)
 1. Install Git from https://git-scm.com/download/win (for Windows), or https://git-scm.com/download for other operating systems. Be sure you're using at least version 2.14.1 to get an important security patch.
-1. Install Node.js from https://nodejs.org (click the Current button to get the latest - you need at least version 8.4).
+1. Install Node.js from https://nodejs.org (click the Current button to get the latest - you need at least version 8.9.1).
 1. (Windows) Install Python version 2.7 from https://www.python.org/ . You can install just for your local user account or for all users. Version 2.7 is required for building the Ed25519 native code package.
 1. (Windows) Install Visual Studio 2017 Build Tools from https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=BuildTools&rel=15 - also needed for building native code. Select the Visual C++ Build Tools suite from the Workloads tab.
 1. (Windows) Install the latest Win64 version of the full (non-Lite) installer for OpenSSL from https://slproweb.com/products/Win32OpenSSL.html to its default install location (c:\OpenSSL-Win64). This is needed to link the Ed25519 native code package. Select the option to install binaries to the OpenSSL bin directory. Donate $10.
