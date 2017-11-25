@@ -60,7 +60,9 @@ The same NodeJS + Express + Passport + passport-sqrl web site can be run from VS
 ### Installing the Test Site Trusted Root Certificate
 The test site uses a certificate chain generated in a custom Certificate Authority under the src\Certs directory. It includes a root, intermediate, and leaf cert. The site uses the leaf as its HTTPS identity. To allow your device's browser to trust the site's cert chain, you need to add the root certificate as a trusted certificate authority.
 
-A small HTTP-only site is started when you build and run the test site. Navigate to http://your-machine-IP:5857 from your computer or device. (If the connection times out, check your Windows computer's firewall settings and ensure node.exe is allowed to listen on ports 5857 and 5858 for private networks.) Follow the instructions on the page to install RootCert.Cert.pem (Android) or RootCert.Cert.cer (Windows) as a trusted root.
+A small HTTP-only site is started when you build and run the test site. Navigate to http://your-machine-IP:5859/certs from your computer or device. (If the connection times out, check your Windows computer's firewall settings and ensure node.exe is allowed to listen on ports 5858 and 5859 for private networks.) Follow the instructions on the page to install RootCert.Cert.pem (Android) or RootCert.Cert.cer (Windows) as a trusted root.
+
+Note that http://your-machine-IP:5859 will redirect from the HTTP to the HTTPS site; only the /certs page noted above is open for browsing under HTTP.
 
 ### To Run the Site
 
