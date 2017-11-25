@@ -182,6 +182,7 @@ gulp.task('copy-test-site-static-files', [], () => {
       Paths.TestSiteRoot + '/**/*.html',
       Paths.TestSiteRoot + '/**/*.css',
       Paths.TestSiteRoot + '/**/*.ejs',
+      Paths.TestSiteRoot + '/**/*.js',
       Paths.Certs + '/*.Cert.pem',  // Test site cert chain
       Paths.Certs + '/TestSite.PrivateKey.pem',  // Test site leaf cert key
       Paths.Certs + '/RootCert.Cert.cer'  // Test site cert chain

@@ -34,7 +34,3 @@ node_modules
 
 # Build output directory
 out
-
-# tslint temp files under src
-src/**/*.js
-src/**/*.d.ts

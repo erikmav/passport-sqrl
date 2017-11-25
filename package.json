@@ -49,6 +49,7 @@
     "@types/ejs": "^2.3.33",
     "@types/express-ejs-layouts": "^2.3.1",
     "@types/express-session": "^1.15.6",
+    "@types/helmet": "0.0.37",
     "@types/mocha": "^2.2.44",
     "@types/nedb": "^1.8.5",
     "@types/node": "^8.0.53",
@@ -58,6 +59,7 @@
     "@types/rimraf": "^2.0.2",
     "@types/serve-favicon": "^2.2.30",
     "@types/spdy": "^3.4.4",
+    "@types/uuid": "^3.4.3",
     "body-parser": "^1.18.2",
     "bunyan": "^1.8.12",
     "chai": "^4.1.2",
@@ -73,6 +75,7 @@
     "gulp-sourcemaps": "^2.6.1",
     "gulp-tslint": "^8.1.2",
     "gulp-typescript": "^3.2.3",
+    "helmet": "^3.9.0",
     "mocha": "^3.5.3",
     "nedb": "^1.8.0",
     "pump": "^1.0.3",
@@ -85,7 +88,8 @@
     "spdy": "^3.4.7",
     "ts-node": "~3.2.0",
     "tslint": "^5.8.0",
-    "typescript": "^2.6.1"
+    "typescript": "^2.6.1",
+    "uuid": "^3.1.0"
   },
   "engines": {
     "node": ">= 8.9.1"

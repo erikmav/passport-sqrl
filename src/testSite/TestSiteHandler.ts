@@ -19,6 +19,7 @@ import * as express from 'express';
 import * as expressLayouts from 'express-ejs-layouts';
 import * as expressSession from 'express-session';
 import * as fs from 'fs';
+import * as helmet from 'helmet';
 import * as http from 'http';
 import * as neDB from 'nedb';
 import * as os from 'os';
@@ -28,6 +29,7 @@ import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
 import * as spdy from 'spdy';
 import { promisify } from 'util';
+import * as uuid from 'uuid';
 import { AuthCompletionInfo, ClientRequestInfo, ILogger, ISQRLIdentityStorage, NutInfo, SQRLExpress, SQRLStrategy, SQRLStrategyConfig, TIFFlags, UrlAndNut } from '../passport-sqrl';
 
 // TypeScript definitions for SPDY do not include an overload that allows the common
@@ -63,6 +65,8 @@ const serverTlsKey = serverTlsCertDir + "/TestSite.PrivateKey.pem";
 // Particularly important for Android where the "Settings->Security->Install From SD Card"
 // only allows installing a root cert into the user trusted store. 
 const serverTlsCert = serverTlsCertDir + "/TestSite.LeafAndIntermediate.Cert.pem";
+
+const oneDayInSeconds = 24 * 3600;
 
 export class TestSiteHandler implements ISQRLIdentityStorage {
   private testSiteServer: spdy.Server;
@@ -113,6 +117,24 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
       .use(favicon(webSiteDir + '/favicon.ico'))  // Early to handle quickly without passing through other middleware layers
       .use(cookieParser())
       .use(bodyParser.urlencoded({extended: true}))  // Needed for parsing bodies (login)
+
+      // ----------------------------------------------------------------------
+      // Content security policy header configuration
+      // https://helmetjs.github.io/docs/csp/
+      // ----------------------------------------------------------------------
+      .use(helmet.contentSecurityPolicy(<helmet.IHelmetContentSecurityPolicyConfiguration> {
+        directives: {
+          defaultSrc: [ "'self'" ],
+          scriptSrc: [ "'self'", 'code.jquery.com' ]
+        }
+      }))
+
+      // ----------------------------------------------------------------------
+      // Other security headers
+      // ----------------------------------------------------------------------
+      .use(helmet.frameguard(<helmet.IHelmetFrameguardConfiguration> { action: 'deny' }))  // Disallow IFRAME embeds
+      // Disabling HSTS header locally but restore if using this code in a real site:
+      // .use(helmet.hsts(<helmet.IHelmetHstsConfiguration> { maxAge: oneDayInSeconds }))
 
       // ----------------------------------------------------------------------
       // Session: We use sessions for ambient cookie-based login.
@@ -243,20 +265,29 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     // Fun hack: Since we're using a custom CA cert chain, it's hard to get the root
     // cert into the trusted store especially on phones. We expose a tiny http single page
     // with links to the root cert for installation, and a link to the https site.
+    // NOTE: Ideally we'd use an HTTP->HTTPS redirect using https://github.com/hengkiardo/express-enforces-ssl
+    // but this is a simple demo site.
     const httpApp = express()
       .set('view engine', 'ejs')
       .set('views', path.join(__dirname, 'views'))
       .use(expressLayouts)
       .use(favicon(webSiteDir + '/favicon.ico'))
-      .get('/', (req, res) => res.render('httpCerts', {
+      .get('/certs', (req, res) => res.render('httpCerts', {
         subpageName: 'HTTPS Certs',
         httpsHost: sqrlConfig.localDomainName,
         httpsPort: port
       }))
       .get('/RootCert.Cert.pem', (req, res) => res.download(__dirname + '/RootCert.Cert.pem'))
-      .get('/RootCert.Cert.cer', (req, res) => res.download(__dirname + '/RootCert.Cert.cer'));
+      .get('/RootCert.Cert.cer', (req, res) => res.download(__dirname + '/RootCert.Cert.cer'))
+      .get('*', (req, res) => {
+        // Redirect HTTP->HTTPS except for /certs and certificate routes above.
+        let redirUrl = "https://" + (req.headers.host || "").replace((port + 1).toString(), port.toString()) + req.url;
+        log.debug(`HTTP->HTTPS redir to ${redirUrl}`);
+        res.writeHead(302, { Location: redirUrl });
+        res.end();
+      });
     this.httpCertServer = http.createServer(httpApp);
-    this.httpCertServer.listen(port - 1, sqrlConfig.localDomainName);
+    this.httpCertServer.listen(port + 1, sqrlConfig.localDomainName);
   }
 
   public close(): void {
