@@ -19,6 +19,7 @@ The demo site code in the passport-sqrl Git repo (https://github.com/erikma/pass
 * Breaking change in ISQRLIdentityStorage - function names updated for consistent Async suffix, e.g. query -> queryAsync
 * Removed AuthCallback from module exports (obsolete).
 * Fixed bug in SQRL URL generator - base64 encoding was mistakenly used for the nut in 0.1.0, causing problems with '+' values in the base64 string  being interpreted as spaces. Updated to issue URLs with base64url values.
+* Test site security updates: CSP header and IFRAME embed protection. Refactored inline scripts to /Scripts directory to match CSP needs.
 
 ## 0.1.0 15 Nov 2017
 * Initial release with 'query' and 'ident' API calls supported
