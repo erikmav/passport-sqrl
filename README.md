@@ -15,11 +15,15 @@ The demo site code in the passport-sqrl Git repo (https://github.com/erikma/pass
 
 # Release History and Release Notes
 
+## 0.2.1 25 Nov 2017
+* Doc update for test site HTTP port (5859).
+
 ## 0.2.0 25 Nov 2017
 * Breaking change in ISQRLIdentityStorage - function names updated for consistent Async suffix, e.g. query -> queryAsync
 * Removed AuthCallback from module exports (obsolete).
 * Fixed bug in SQRL URL generator - base64 encoding was mistakenly used for the nut in 0.1.0, causing problems with '+' values in the base64 string  being interpreted as spaces. Updated to issue URLs with base64url values.
 * Test site security updates: CSP header and IFRAME embed protection. Refactored inline scripts to /Scripts directory to match CSP needs.
+* Updated min Node version to new LTR 8.9.1
 
 ## 0.1.0 15 Nov 2017
 * Initial release with 'query' and 'ident' API calls supported
@@ -61,7 +65,7 @@ You'll need to be on a network for these to work. (Running in airplane mode will
 The integration tests also make use of a mock SQRL client that knows how to run the client side of the protocol. This could be useful in its own right if you want to extract it for general purpose use in a JavaScript based client environment.
 
 ## Browser Testing with the Test Site
-The same NodeJS + Express + Passport + passport-sqrl web site can be run from VSCode. It uses HTTPS on port 5858 and HTTP on port 5857.
+The same NodeJS + Express + Passport + passport-sqrl web site can be run from VSCode. It uses HTTPS on port 5858 and HTTP on port 5859.
 
 ### Installing the Test Site Trusted Root Certificate
 The test site uses a certificate chain generated in a custom Certificate Authority under the src\Certs directory. It includes a root, intermediate, and leaf cert. The site uses the leaf as its HTTPS identity. To allow your device's browser to trust the site's cert chain, you need to add the root certificate as a trusted certificate authority.
