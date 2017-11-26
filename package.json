@@ -59,7 +59,6 @@
     "@types/rimraf": "^2.0.2",
     "@types/serve-favicon": "^2.2.30",
     "@types/spdy": "^3.4.4",
-    "@types/uuid": "^3.4.3",
     "body-parser": "^1.18.2",
     "bunyan": "^1.8.12",
     "chai": "^4.1.2",
@@ -88,8 +87,7 @@
     "spdy": "^3.4.7",
     "ts-node": "~3.2.0",
     "tslint": "^5.8.0",
-    "typescript": "^2.6.1",
-    "uuid": "^3.1.0"
+    "typescript": "^2.6.1"
   },
   "engines": {
     "node": ">= 8.9.1"

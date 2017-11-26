@@ -2,7 +2,7 @@
 
 import { assert } from "chai";
 import * as express from 'express';
-import { AuthCallback, AuthCompletionInfo, AuthenticateAsyncResult, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig, TIFFlags, UrlAndNut } from '../passport-sqrl';
+import { AuthCompletionInfo, AuthenticateAsyncResult, ClientRequestInfo, SQRLStrategy, SQRLStrategyConfig, TIFFlags, UrlAndNut } from '../passport-sqrl';
 import { MockLogger } from '../SqrlTests/MockLogger';
 import { MockSQRLClient, ServerResponseInfo } from './MockSqrlClient';
 

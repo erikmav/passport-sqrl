@@ -29,7 +29,6 @@ import * as qr from 'qr-image';
 import * as favicon from 'serve-favicon';
 import * as spdy from 'spdy';
 import { promisify } from 'util';
-import * as uuid from 'uuid';
 import { AuthCompletionInfo, ClientRequestInfo, ILogger, ISQRLIdentityStorage, NutInfo, SQRLExpress, SQRLStrategy, SQRLStrategyConfig, TIFFlags, UrlAndNut } from '../passport-sqrl';
 
 // TypeScript definitions for SPDY do not include an overload that allows the common
@@ -241,10 +240,15 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
           });
         }
       })
-      .use(express.static(webSiteDir));  // Serve static scripts and assets. Must come after non-file (e.g. templates, REST) middleware
+
+      // ----------------------------------------------------------------------
+      // Serve static scripts and assets. Must come after non-file
+      // (e.g. templates, REST) middleware.
+      // ----------------------------------------------------------------------
+      .use(express.static(webSiteDir));
 
     // SQRL requires HTTPS so we use SPDY which happily gives us HTTP/2 at the same time.
-    // Node 8.6+ contains a native HTTP/2 module we can move to over time.
+    // Node 8.6+ contains a native HTTP/2 module we can move to once it moves to Stable.
     this.testSiteServer = spdy.server.create(<spdy.server.ServerOptions> {
       // Leaf cert PEM files for server certificate. See CreateLeaf.cmd and related scripts.
       cert: fs.readFileSync(serverTlsCert),
@@ -265,8 +269,6 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     // Fun hack: Since we're using a custom CA cert chain, it's hard to get the root
     // cert into the trusted store especially on phones. We expose a tiny http single page
     // with links to the root cert for installation, and a link to the https site.
-    // NOTE: Ideally we'd use an HTTP->HTTPS redirect using https://github.com/hengkiardo/express-enforces-ssl
-    // but this is a simple demo site.
     const httpApp = express()
       .set('view engine', 'ejs')
       .set('views', path.join(__dirname, 'views'))
@@ -281,6 +283,8 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
       .get('/RootCert.Cert.cer', (req, res) => res.download(__dirname + '/RootCert.Cert.cer'))
       .get('*', (req, res) => {
         // Redirect HTTP->HTTPS except for /certs and certificate routes above.
+        // NOTE: Not using https://github.com/hengkiardo/express-enforces-ssl
+        // because it does not handle non-standard ports.
         let redirUrl = "https://" + (req.headers.host || "").replace((port + 1).toString(), port.toString()) + req.url;
         log.debug(`HTTP->HTTPS redir to ${redirUrl}`);
         res.writeHead(302, { Location: redirUrl });
@@ -298,17 +302,26 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
   }
 
   // See doc comments on ISQRLIdentityStorage.nutIssuedToClientAsync().
-  public nutIssuedToClientAsync(urlAndNut: UrlAndNut, originalLoginNut?: string): Promise<void> {
-    return (<any> this.nutTable).insertAsync(new NutDBRecord(urlAndNut.nutString, urlAndNut.url, originalLoginNut));
+  public async nutIssuedToClientAsync(urlAndNut: UrlAndNut, originalLoginNut?: string): Promise<void> {
+    this.log.finest(() => `nutIssuedToClientAsync: Storing nut ${urlAndNut.nutString}`);
+    await (<any> this.nutTable).insertAsync(new NutDBRecord(urlAndNut.nutString, urlAndNut.url, originalLoginNut));
+    this.log.finest(() => `nutIssuedToClientAsync: Stored nut ${urlAndNut.nutString}`);
   }
 
-  public getNutInfoAsync(nut: string): Promise<NutInfo | null> {
-    return this.getNutRecordAsync(nut);  // NutDBRecord derives from NutInfo.
+  public async getNutInfoAsync(nut: string): Promise<NutInfo | null> {
+    this.log.finest(() => `getNutInfoAsync: Retrieving nut ${nut}`);
+    let nutDBRecord = await this.getNutRecordAsync(nut);  // NutDBRecord derives from NutInfo.
+    if (!nutDBRecord) {
+      this.log.finest(() => `getNutInfoAsync: Nut ${nut} not found`);
+    } else {
+      this.log.finest(() => `getNutInfoAsync: Nut ${nut} found`);
+    }
+    return nutDBRecord;
   }
 
-  public async query(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public async queryAsync(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL query. We don't create any new user records, just return whether we know about the user.
-    let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
+    let authInfo: AuthCompletionInfo = await this.findUserByEitherKeyAsync(clientRequestInfo);
     if (authInfo.user && clientRequestInfo.returnSessionUnlockKey) {
       let user = <UserDBRecord> authInfo.user;
       authInfo.sessionUnlockKey = user.sqrlServerUnlockPublicKey;
@@ -316,9 +329,9 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     return authInfo;
   }
 
-  public async ident(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo> {
+  public async identAsync(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo> {
     // SQRL login request.
-    let authInfo: AuthCompletionInfo = await this.findUserByEitherKey(clientRequestInfo);
+    let authInfo: AuthCompletionInfo = await this.findUserByEitherKeyAsync(clientRequestInfo);
     if (authInfo.user) {
       // tslint:disable-next-line:no-bitwise
       if (authInfo.tifValues & TIFFlags.PreviousIDMatch) {
@@ -357,17 +370,17 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     return authInfo;
   }
 
-  public disable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public disableAsync(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL identity disable request.
     return Promise.resolve(new AuthCompletionInfo());  // TODO
   }
 
-  public enable(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public enableAsync(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL identity enable request.
     return Promise.resolve(new AuthCompletionInfo());  // TODO
   }
 
-  public remove(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  public removeAsync(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // SQRL identity remove request.
     return Promise.resolve(new AuthCompletionInfo());  // TODO
   }
@@ -386,7 +399,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     this.userTable.findOne(userDBRecord, done);
   }
 
-  private async findUserByEitherKey(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  private async findUserByEitherKeyAsync(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     let result = new AuthCompletionInfo();
 
     // Search for both keys simultaneously if the previous key is specified.
@@ -412,7 +425,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     return result;
   }
 
-  private async findAndUpdateOrCreateUser(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
+  private async findAndUpdateOrCreateUserAsync(clientRequestInfo: ClientRequestInfo): Promise<AuthCompletionInfo> {
     // Treat the SQRL client's public key as a primary search key in the database.
     let searchRecord = <UserDBRecord> {
       sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,

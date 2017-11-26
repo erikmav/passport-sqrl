@@ -15,6 +15,11 @@ The demo site code in the passport-sqrl Git repo (https://github.com/erikma/pass
 
 # Release History and Release Notes
 
+## 0.2.0 25 Nov 2017
+* Breaking change in ISQRLIdentityStorage - function names updated for consistent Async suffix, e.g. query -> queryAsync
+* Removed AuthCallback from module exports (obsolete).
+* Fixed bug in SQRL URL generator - base64 encoding was mistakenly used for the nut in 0.1.0, causing problems with '+' values in the base64 string  being interpreted as spaces. Updated to issue URLs with base64url values.
+
 ## 0.1.0 15 Nov 2017
 * Initial release with 'query' and 'ident' API calls supported
 * Successful login using mid-November desktop SQRL client. No successful logins with Android phone app yet. iOS app not tried.
@@ -67,7 +72,7 @@ Note that http://your-machine-IP:5859 will redirect from the HTTP to the HTTPS s
 ### To Run the Site
 
 1. Press the F5 key while in VSCode.
-1. If a firewall popup appears, allow Node.js to open port 5858
+1. If a firewall popup appears, allow Node.js to open port 5858 and 5859
 1. Wait for the orange debugging color to appear in the status bar.
 
 ### Testing with a Browser

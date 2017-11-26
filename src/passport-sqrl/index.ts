@@ -12,6 +12,8 @@ import * as urlLib from 'url';
 // TODO: Support disable, enable, remove
 // TODO: Support suk client request and server validation
 // TODO: Add urs= field
+// TODO: Add UT for rekey request
+// TODO: Test rekey against SQRL desktop implementation
 
 /** Definitions for the Transaction Information Flag values specified in the SQRL specification. */
 export enum TIFFlags {
@@ -51,8 +53,7 @@ export enum TIFFlags {
 }
 
 /**
- * Returned from a completed AuthCallback promise.
- * Exceptions thrown from the AuthCallback are turned into HTTP 500 errors.
+ * Returned from a completed ISQRLIdentityStorage function promise.
  */
 export class AuthCompletionInfo {
   /**
@@ -76,13 +77,6 @@ export class AuthCompletionInfo {
     this.tifValues = 0;
   }
 }
-
-/**
- * An authentication callback called from the SQRL passport strategy object.
- * On its returned Promise completion the result is used to feed the response to the caller.
- * @param clientRequestInfo Information parsed and verified from the information provided by the client.
- */
-export type AuthCallback = (clientRequestInfo: ClientRequestInfo) => Promise<AuthCompletionInfo>;
 
 /**
  * Log levels for ILogger.
@@ -181,7 +175,7 @@ export interface ISQRLIdentityStorage {
    * If the user profile has previously been disabled, no record updates should be
    * performed and TIFFlags.IDDisabled should be set in AuthCompletionInfo.tifValues.
    */
-  query(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
+  queryAsync(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
   /**
    * Called on a SQRL client call to log in, once the client message
@@ -205,7 +199,7 @@ export interface ISQRLIdentityStorage {
    * If the user profile has previously been disabled, no record updates should be
    * performed and TIFFlags.IDDisabled should be set in AuthCompletionInfo.tifValues.
    */
-  ident(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
+  identAsync(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
   /**
    * Called on a SQRL client call to disable a SQRL identity, once the client message
@@ -217,7 +211,7 @@ export interface ISQRLIdentityStorage {
    * it should allow multiple disable calls without error. This case is common
    * in the case of client retries over a flaky network.
    */
-  disable(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
+  disableAsync(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
   /**
    * Called on a SQRL client call to enable a SQRL identity that was previously
@@ -228,7 +222,7 @@ export interface ISQRLIdentityStorage {
    * not disbled it should simply take no action on the user record.
    * This case is common in the case of client retries over a flaky network.
    */
-  enable(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
+  enableAsync(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 
   /**
    * Called on a SQRL client call to remove a SQRL identity, once the client message
@@ -237,7 +231,7 @@ export interface ISQRLIdentityStorage {
    * the related user record and prevent future logins using the primary and,
    * if specified, previous identity public keys presented.
    */
-  remove(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
+  removeAsync(clientRequestInfo: ClientRequestInfo, nutInfo: NutInfo): Promise<AuthCompletionInfo>;
 }
 
 /**
@@ -380,19 +374,19 @@ export class SQRLExpress {
     let authCompletion: AuthCompletionInfo;
     switch (clientRequestInfo.sqrlCommand) {
       case 'query':
-        authCompletion = await this.identityStorage.query(clientRequestInfo, nutInfo);
+        authCompletion = await this.identityStorage.queryAsync(clientRequestInfo, nutInfo);
         break;
       case 'ident':
-        authCompletion = await this.identityStorage.ident(clientRequestInfo, nutInfo);
+        authCompletion = await this.identityStorage.identAsync(clientRequestInfo, nutInfo);
         break;
       case 'disable':
-        authCompletion = await this.identityStorage.disable(clientRequestInfo, nutInfo);
+        authCompletion = await this.identityStorage.disableAsync(clientRequestInfo, nutInfo);
         break;
       case 'enable':
-        authCompletion = await this.identityStorage.enable(clientRequestInfo, nutInfo);
+        authCompletion = await this.identityStorage.enableAsync(clientRequestInfo, nutInfo);
         break;
       case 'remove':
-        authCompletion = await this.identityStorage.remove(clientRequestInfo, nutInfo);
+        authCompletion = await this.identityStorage.removeAsync(clientRequestInfo, nutInfo);
         break;
       default:
         throw new ClientInputError(`Unknown SQRL command ${clientRequestInfo.sqrlCommand}`);
@@ -892,7 +886,7 @@ export class BodyParser {
  * characters per the SQRL specification. Public for unit testing.
  */
 export function toSqrlBase64(buf: Buffer): string {
-  return trimEqualsChars(buf.toString('base64'));
+  return trimEqualsChars(base64url.encode(buf));
 }
 
 /** Trims any tail '=' characters, returning the trimmed string. Public for unit testing. */
