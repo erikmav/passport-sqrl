@@ -43,7 +43,7 @@ L = Bothell
 O = passport-sqrl
 CN = localhost
 
-# Root CA cert policy used from CreateRoot.cmd and 
+# Root CA cert policy used from CreateRoot.cmd
 # See https://jamielinux.com/docs/openssl-certificate-authority/create-the-root-pair.html
 [v3_root_ca_policy]
 subjectKeyIdentifier = hash
