@@ -1,5 +1,5 @@
 # Passport-SQRL
-An [ExpressJS](http://expressjs.com/) and [PassportJS](https://github.com/jaredhanson/passport) implementation of the [SQRL authentication protocol](https://www.grc.com/sqrl/sqrl.htm).
+A Node.js, [ExpressJS](http://expressjs.com/), and [PassportJS](https://github.com/jaredhanson/passport) implementation of the [SQRL authentication protocol](https://www.grc.com/sqrl/sqrl.htm).
 
 The code is written in TypeScript, with the transcoded JavaScript outputs targeted to ES6 for modern Node.js compatibility. The resulting output is published as NPM module 'passport-sqrl'.
 
