@@ -846,7 +846,7 @@ export class BodyParser {
     let serverDecoded = base64url.decode(params.server);
     if (serverDecoded.startsWith('sqrl')) {
       let qrCodeUrl: urlLib.Url = urlLib.parse(serverDecoded, /*parseQueryString:*/true);
-      requestInfo.nut = qrCodeUrl.query.nut;
+      requestInfo.nut = qrCodeUrl.query ? qrCodeUrl.query.nut : undefined;
     } else {
       let serverProps = BodyParser.parseBase64CRLFSeparatedFields(params.server);
       requestInfo.nut = serverProps.nut;
