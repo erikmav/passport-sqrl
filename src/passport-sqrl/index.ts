@@ -348,7 +348,8 @@ export class SQRLExpress {
     if (clientRequestInfo.protocolVersion !== 1) {
       throw new ClientInputError(`This server only handles SQRL protocol revision 1`);
     }
-    let nutInfoPromise: Promise<NutInfo | null> = this.identityStorage.getNutInfoAsync(clientRequestInfo.nut);
+    let nutInfoPromise: Promise<NutInfo | null> = clientRequestInfo.nut ?
+        this.identityStorage.getNutInfoAsync(clientRequestInfo.nut) : Promise.resolve(null);
 
     let nextNut: string | Buffer = this.nutGenerator(req);
     let nextNutStr = SqrlUrlFactory.nutToString(nextNut);
@@ -492,7 +493,7 @@ export class AuthenticateAsyncResult {
   /** base64url encoded response fields for return in the API response body. */
   public body?: string;
 
-  public httpResponseCode: number;
+  public httpResponseCode: number = 500;
 }
 
 /** A SQRL URL and its contained nut, broken out to separate fields for varying purposes. */
@@ -518,7 +519,7 @@ export class UrlAndNut {
  */
 export class ClientRequestInfo {
   /** The client's SQRL protocol revision. */
-  public protocolVersion: number;
+  public protocolVersion: number = 1;
 
   /**
    * The requested SQRL operation. One of the various SQRL client commands
@@ -532,7 +533,7 @@ export class ClientRequestInfo {
    *   'remove' - requests the server to remove the user's identity (which must have previously been
    *              disabled) from the server's identity store.
    */
-  public sqrlCommand: string;
+  public sqrlCommand?: string;
 
   /**
    * The nut value presented to the server. This could come from an original
@@ -546,7 +547,7 @@ export class ClientRequestInfo {
    * login, for supporting auto-login flows. See doc comments on
    * ISQRLIdentityStorage nutIssuedToClientAsync() and getNutInfoAsync().
    */
-  public nut: string;
+  public nut?: string;
 
   /**
    * The primary identity public key that the client wishes to use to contact this
@@ -560,7 +561,7 @@ export class ClientRequestInfo {
    * This public key has been successfully validated against the corresponding client-provided
    * signature in the request.
    */
-  public primaryIdentityPublicKey: string;
+  public primaryIdentityPublicKey?: string;
 
   /**
    * Optional previous identity public key that the client wishes to deprecate
@@ -607,7 +608,7 @@ export class ClientRequestInfo {
    * that the server disable other allowed authentication methods in favor of only SQRL.
    * The server should ignore this field value in query commands.
    */
-  public useSqrlIdentityOnly: boolean;
+  public useSqrlIdentityOnly: boolean = false;
 
   /**
    * Optional flag from the client ('hardlock' in its opt= option flag list, see
@@ -615,7 +616,7 @@ export class ClientRequestInfo {
    * that the server disable security question style alternate identity recovery methods.
    * The server should ignore this field value in query commands.
    */
-  public hardLockSqrlUse: boolean;
+  public hardLockSqrlUse: boolean = false;
 
   /**
    * Optional flag from the client ('cps' in its opt= option flag list, see
@@ -623,7 +624,7 @@ export class ClientRequestInfo {
    * that the server return in a url= response the logged-in URL that a client-side
    * plugin should redirect to after login is completed.
    */
-  public clientProvidedSession: boolean;
+  public clientProvidedSession: boolean = false;
 
   /**
    * Optional flag from the client ('suk' in its opt= option flag list, see
@@ -631,7 +632,7 @@ export class ClientRequestInfo {
    * that the server return its stored Session Unlock Key value to the client
    * so it can issue a re-key request.
    */
-  public returnSessionUnlockKey: boolean;
+  public returnSessionUnlockKey: boolean = false;
 
   /**
    * Optional client information (the 'btn=' information field) containing the
@@ -646,24 +647,27 @@ export class ClientRequestInfo {
    * The auth handler should store this nut in its "Recently Issued Nuts"
    * cache to allow responding to NutCheckCallback calls.
    */
-  public nextNut: string;
+  public nextNut?: string;
 
   /**
    * The relative URL to be passed back in the qry= server response field for
    * the next communication from the client.
    */
-  public nextUrl: string;
+  public nextUrl?: string;
 
   /** Provides a Buffer version of primaryIdentityPublicKey. */
-  public primaryIdentityPublicKeyBuf(): Buffer {
-    return Buffer.from(this.primaryIdentityPublicKey, 'base64');
+  public primaryIdentityPublicKeyBuf(): Buffer | null {
+    if (this.primaryIdentityPublicKey) {
+      return Buffer.from(this.primaryIdentityPublicKey, 'base64');
+    }
+    return null;
   }
 }
 
 /** Provided to the SQRL strategy constructor to provide configuration information. */
 export class SQRLStrategyConfig {
   /** Provides the domain name to use in generating SQRL URLs to send to clients. */
-  public localDomainName: string;
+  public localDomainName: string = 'please-configure-me.com';
 
   /** The port. If not specified the URL will not include one and the browser will use the appropriate default. */
   public port?: number;
@@ -710,7 +714,7 @@ export class SQRLStrategyConfig {
    * It is sent to the client in the url= response parameter
    * (see https://www.grc.com/sqrl/semantics.htm).
    */
-  public clientLoginSuccessUrl: string;
+  public clientLoginSuccessUrl?: string;
 
   /**
    * Optional 302 redirect that a same-device (browser plugin) SQRL
@@ -724,7 +728,7 @@ export class SQRLStrategyConfig {
 /** Data class containing information about a nut from identity storage. */
 export class NutInfo {
   /** The unique nut nonce generated and sent to a client. */
-  public nut: string;
+  public nut?: string;
   
   /** The nut value from an original QR code, for backtracking from this later nut. */
   public originalLoginNut?: string;
@@ -846,7 +850,7 @@ export class BodyParser {
     let serverDecoded = base64url.decode(params.server);
     if (serverDecoded.startsWith('sqrl')) {
       let qrCodeUrl: urlLib.Url = urlLib.parse(serverDecoded, /*parseQueryString:*/true);
-      requestInfo.nut = qrCodeUrl.query ? qrCodeUrl.query.nut : undefined;
+      requestInfo.nut = qrCodeUrl.query && typeof qrCodeUrl.query !== 'string' ? qrCodeUrl.query.nut.toString() : undefined;
     } else {
       let serverProps = BodyParser.parseBase64CRLFSeparatedFields(params.server);
       requestInfo.nut = serverProps.nut;

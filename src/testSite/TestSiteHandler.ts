@@ -517,16 +517,16 @@ class UserDBRecord {
    * The current primary identity key. This is a primary search term and would
    * make sense to place into a database index.
    */
-  public sqrlPrimaryIdentityPublicKey: string;
+  public sqrlPrimaryIdentityPublicKey?: string;
 
   /** Up to four previously seen previous identity keys, for reference. */
   public sqrlPreviousIdentityPublicKeys: string[] = [];
   
   /** The client-provided identity unlock public key, which the client can query to form an identoty change key. */
-  public sqrlServerUnlockPublicKey: string;
+  public sqrlServerUnlockPublicKey?: string;
 
   /** A client-provided validation key for validating an identity unlock. */
-  public sqrlServerVerifyUnlockPublicKey: string;
+  public sqrlServerVerifyUnlockPublicKey?: string;
 
   /** Client has requested that this site only use its SQRL identity and not any alternate credentials. */
   public sqrlUseSqrlIdentityOnly: boolean = false;
@@ -550,7 +550,7 @@ class NutDBRecord extends NutInfo {
   public createdAt: Date;
 
   /** Whether the nut was successfully logged in. Updated on login. */
-  public loggedIn: boolean;
+  public loggedIn: boolean = false;
 
   /** The primary public key of a user if a successful login was recorded for this nut. */
   public clientPrimaryIdentityPublicKey?: string;
@@ -566,6 +566,6 @@ class NutDBRecord extends NutInfo {
 
 /** Returned from /pollNut call. login.ejs makes use of this along with the cookie header. */
 class NutPollResult {
-  public loggedIn: boolean;
+  public loggedIn: boolean = false;
   public redirectTo?: string;
 }

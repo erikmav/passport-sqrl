@@ -303,13 +303,13 @@ class MockSQRLIdentityStorage implements ISQRLIdentityStorage {
   public nutIssuedToClientCalls = 0;
   public getNutInfoCalls = 0;
   
-  public onQuery: AuthCallback;
-  public onIdent: AuthCallback;
-  public onDisable: AuthCallback;
-  public onEnable: AuthCallback;
-  public onRemove: AuthCallback;
-  public onNutIssuedToClient: (urlAndNut: UrlAndNut, originalLoginNut?: string) => void;
-  public onGetNutInfo: (nut: string) => NutInfo | null;
+  public onQuery?: AuthCallback;
+  public onIdent?: AuthCallback;
+  public onDisable?: AuthCallback;
+  public onEnable?: AuthCallback;
+  public onRemove?: AuthCallback;
+  public onNutIssuedToClient?: (urlAndNut: UrlAndNut, originalLoginNut?: string) => void;
+  public onGetNutInfo?: (nut: string) => NutInfo | null;
 
   private issuedNuts: any = {};
 

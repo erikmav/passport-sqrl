@@ -33,7 +33,7 @@ export class BunyanLogger implements ILogger {
     this.logLevelBacking = lev;
   }
 
-  private logLevelBacking: LogLevel;
+  private logLevelBacking: LogLevel = LogLevel.Debug;
   
   constructor(name: string, logLevel: LogLevel = LogLevel.Debug) {
     this.bunyanLogger = bunyan.createLogger({

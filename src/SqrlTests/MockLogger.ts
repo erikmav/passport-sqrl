@@ -2,7 +2,7 @@ import { ILogger, LogLevel } from '../passport-sqrl';
 
 /** Common test mock */
 export class MockLogger implements ILogger {
-  public logLevel: LogLevel;
+  public logLevel: LogLevel = LogLevel.Debug;
 
   public error(message: string): void {
     console.log(`ERROR: ${message}`);

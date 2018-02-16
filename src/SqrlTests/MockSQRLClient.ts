@@ -39,10 +39,10 @@ export class MockSQRLClient {
   }
 
   // Options flags that get sent to the server on each request.
-  public useSqrlIdentityOnly: boolean;
-  public hardLockSqrlUse: boolean;
-  public clientProvidedSession: boolean;
-  public returnSessionUnlockKey: boolean;
+  public useSqrlIdentityOnly: boolean = false;
+  public hardLockSqrlUse: boolean = false;
+  public clientProvidedSession: boolean = false;
+  public returnSessionUnlockKey: boolean = false;
 
   public canonicalizedSqrlUrl: string;
   public serverContactUrl: string;
@@ -53,12 +53,12 @@ export class MockSQRLClient {
   public serverReturnedSessionUnlockKey: Buffer | undefined;
 
   // Malformed request injection flags
-  public omitVersion: boolean;
-  public omitCommand: boolean;
-  public omitIDKey: boolean;
-  public omitPrimarySignature: boolean;
-  public omitClient: boolean;
-  public omitServer: boolean;
+  public omitVersion: boolean = false;
+  public omitCommand: boolean = false;
+  public omitIDKey: boolean = false;
+  public omitPrimarySignature: boolean = false;
+  public omitClient: boolean = false;
+  public omitServer: boolean = false;
   
   private primaryIdentityPrivateKey: Buffer;
   private previousIdentityPrivateKeys: Buffer[] = [];
@@ -260,25 +260,25 @@ export class MockSQRLClient {
 
 /** The POST request body fields sent by the client to the server. Field names are defined by the SQRL standard. */
 export class RequestPostBody {
-  public client: string;
-  public server: string;
-  public ids: string;
+  public client?: string;
+  public server?: string;
+  public ids?: string;
   public pids?: string;
   public urs?: string;
 }
 
 export class ServerResponseInfo {
   /** The SQRL protocol version numbers supported by the server. */
-  public supportedProtocolVersions: number[];
+  public supportedProtocolVersions: number[] = [];
 
   /** The server nut value that the client should use in its next call to the server. */
-  public nextNut: string;
+  public nextNut?: string;
 
   /** Exposes a numeric value for the TIF flags. */
-  public tifValues: TIFFlags;
+  public tifValues: TIFFlags = 0;
 
   /** The new URL path and query string to be used in the next contact with the server. */
-  public nextRequestPathAndQuery: string;
+  public nextRequestPathAndQuery?: string;
 
   /**
    * When the client included its 'cps' (client-provided session) flag, this specifies the
