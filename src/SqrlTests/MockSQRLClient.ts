@@ -32,10 +32,9 @@ export class MockSQRLClient {
   public static generateServerContactUrl(sqrlUrl: string): string {
     // Disassemble the SQRL URL and reassemble with callable HTTP scheme/protocol.
     let urlObj: url.Url = url.parse(sqrlUrl, /*parseQueryString:*/false);
-    let scheme = (urlObj.protocol || '').toLowerCase() === 'qrl:' ? 'http' : 'https';
     let path = urlObj.path ? urlObj.path : '';  // With parseQueryString==false this is the full path and query string after the hostname
     let port = urlObj.port ? ':' + urlObj.port : '';
-    return `${scheme}://${urlObj.hostname}${port}${path}`;
+    return `https://${urlObj.hostname}${port}${path}`;
   }
 
   // Options flags that get sent to the server on each request.
