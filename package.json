@@ -90,7 +90,7 @@
     "typescript": "^2.9.2"
   },
   "engines": {
-    "node": ">= 8.11.3"
+    "node": ">= 10.14.1"
   },
   "license": "MIT"
 }
