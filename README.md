@@ -15,6 +15,10 @@ The [demo site code](https://github.com/erikma/passport-sqrl/tree/master/src/tes
 
 # Release History and Release Notes
 
+## 0.2.2 8 Dev 2018
+* Update to ed25519 fork that supports NodeJS 10 and library layouts in OpenSSL 1.1.0+. Open PR for merging to ed25519 master [here](https://github.com/dazoe/ed25519/pull/20).
+* npm update to head of dependencies.
+
 ## 0.2.1 25 Nov 2017
 * Doc update for test site HTTP port (5859).
 
