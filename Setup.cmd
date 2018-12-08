@@ -7,8 +7,6 @@ rem NPM packages or perform other setups.
 where npm
 if ERRORLEVEL 1 echo ERROR: NPM not found. Did you install Node.js? && exit /b 1
 
-set _site_pkg=
-
 echo.
 echo ==========================================================================
 echo Ensuring we have all the needed Node.js Package Manager packages.
