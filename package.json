@@ -46,13 +46,13 @@
     "@types/bunyan": "^1.8.5",
     "@types/chai": "^4.1.7",
     "@types/cookie-parser": "^1.4.1",
-    "@types/ejs": "^2.6.0",
+    "@types/ejs": "^2.6.1",
     "@types/express-ejs-layouts": "^2.3.1",
     "@types/express-session": "^1.15.11",
     "@types/helmet": "0.0.37",
     "@types/mocha": "^2.2.48",
-    "@types/nedb": "^1.8.6",
-    "@types/node": "^8.10.38",
+    "@types/nedb": "^1.8.7",
+    "@types/node": "^8.10.39",
     "@types/qr-image": "^3.2.1",
     "@types/request": "^2.48.1",
     "@types/request-promise-native": "^1.0.15",
@@ -82,12 +82,12 @@
     "request": "^2.88.0",
     "request-debug": "^0.2.0",
     "request-promise-native": "^1.0.4",
-    "rimraf": "^2.6.2",
+    "rimraf": "^2.6.3",
     "serve-favicon": "^2.5.0",
     "spdy": "^3.4.7",
     "ts-node": "~3.2.0",
-    "tslint": "^5.11.0",
-    "typescript": "^3.2.2"
+    "tslint": "^5.12.1",
+    "typescript": "^3.2.4"
   },
   "engines": {
     "node": ">= 10.14.1"
