@@ -15,7 +15,7 @@ The [demo site code](https://github.com/erikma/passport-sqrl/tree/master/src/tes
 
 # Release History and Release Notes
 
-## 0.2.2 8 Dev 2018
+## 0.2.2 8 Dec 2018
 * Update to ed25519 fork that supports NodeJS 10 and library layouts in OpenSSL 1.1.0+. Open PR for merging to ed25519 master [here](https://github.com/dazoe/ed25519/pull/20).
 * npm update to head of dependencies.
 
@@ -45,7 +45,6 @@ You'll need to clone the package's home repo from https://github.com/erikma/pass
 1. Install Node.js from https://nodejs.org. You need at least version 10.14.1.
 1. (Windows) Install Python version 2.7 from https://www.python.org/ . You can install just for your local user account or for all users. Version 2.7 is required for building the Ed25519 native code package. Set the path to python.exe in the PYTHON environment variable.
 1. (Windows) Install Visual Studio 2017 Build Tools from https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=BuildTools&rel=15 - also needed for building native code. Select the Visual C++ Build Tools suite from the Workloads tab.
-1. (Windows) Install the latest Win64 version of the full (non-Lite) installer for OpenSSL from https://slproweb.com/products/Win32OpenSSL.html to `c:\OpenSSL-Win64` . This is needed to link the Ed25519 native code package. Donate $10.
 
 * We recommend Visual Studio Code from https://www.visualstudio.com/products/code-vs - run `code .` in the repo root folder. You should install the "TSLint" extension which runs the lint tool as you type.
 * (Windows) The `Setup.cmd` command should be run after any pull from GitHub to install latest packages.
