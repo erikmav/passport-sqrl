@@ -15,6 +15,10 @@ The [demo site code](https://github.com/erikma/passport-sqrl/tree/master/src/tes
 
 # Release History and Release Notes
 
+## 0.2.3 16 Mar 2019
+* Update to newer ed25519 [fork](https://github.com/gaoxiangxyz/ed25519) that does not need OpenSSL to be installed locally to build. Python 2.7 still needed however.
+* You may have to force-update your "nan" package to 2.13.1 or higher by running `npm install nan@2.13.1` to get this to work. The package.json in that fork needs updating.
+
 ## 0.2.2 8 Dec 2018
 * Update to ed25519 fork that supports NodeJS 10 and library layouts in OpenSSL 1.1.0+. Open PR for merging to ed25519 master [here](https://github.com/dazoe/ed25519/pull/20).
 * npm update to head of dependencies.
