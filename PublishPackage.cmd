@@ -11,7 +11,7 @@ if ERRORLEVEL 1 echo ERROR: Login failed && exit /b 1
 
 echo.
 echo Publishing package
-call npm publish ~dp0out/passport-sqrl %*
+call npm publish out/passport-sqrl %*
 if ERRORLEVEL 1 echo ERROR: Publish failed && exit /b 1
 
 exit /b 0
