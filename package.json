@@ -38,6 +38,7 @@
     "base64url": "^2.0.0",
     "ed25519": "git://github.com/erikma/ed25519.git#001935e5197c3acd98d09cbb5181481c4b62c005",
     "express": "^4.16.4",
+    "nan": "^2.13.1",
     "passport": "^0.4.0",
     "passport-strategy": "^1.0.0"
   },
