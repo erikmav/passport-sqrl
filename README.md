@@ -99,5 +99,4 @@ This might only work with Firefox these days as browsers get more strict.
 # Useful Links
 
 * SQRL main page: https://www.grc.com/sqrl/sqrl.htm
-* SQRL link protocol to a site login page: https://www.grc.com/sqrl/protocol.htm and https://www.grc.com/sqrl/semantics.htm
-* SQRL web server expected behavior: https://www.grc.com/sqrl/server.htm
+* SQRL forum: https://sqrl.grc.com/
