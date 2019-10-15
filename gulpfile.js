@@ -67,40 +67,12 @@ var Paths = {
   IntegrationTestsOutput: 'out/IntegrationTests',
 };
 
-// ---------------------------------------------------------------------------
-// Primary entry point commands: Running 'gulp' cleans and runs build,
-// 'build' is an alias for 'default' and required by Visual Studio Code
-// integration.
-// ---------------------------------------------------------------------------
-gulp.task('default', [
-  'clean',
-
-  'tslint',
-  'transpile-main-package',
-  'transpile-sqrl-tests',
-  'transpile-sqrl-integration-tests',
-  'transpile-test-site',
-
-  'copy-test-site-static-files',
-  'copy-sqrl-tests-static-files',
-  'copy-sqrl-integration-tests-static-files',
-
-  'run-passport-sqrl-unit-tests',
-  'run-test-site-integration-tests',
-
-  'copy-package-json',
-  'copy-package-readme',
-]);
-gulp.task('build', ['default']);
-
 gulp.task('clean', () => {
   // Clean up output directories.
-  // .sync() version forces completion before returning from task, making
-  // it complete before the next task in a dependency list.
-  return del.sync([ Paths.OutputRoot ]);
+  return del([ Paths.OutputRoot ]);
 });
 
-gulp.task("tslint", [], () => {
+gulp.task('tslint', () => {
   return gulp.src(Paths.SourceRoot + "/**/*.ts")
       .pipe(tslint({
         formatter: "verbose"
@@ -108,48 +80,48 @@ gulp.task("tslint", [], () => {
       .pipe(tslint.report())
 });
 
-gulp.task('transpile-main-package', [], () => {
+gulp.task('transpile-main-package', () => {
   return gulp.src(Paths.PassportSqrlRoot + '/index.ts')
       .pipe(gulpTypescript.createProject('tsconfig.json', {
         declaration: true
       })())
       .pipe(gulp.dest(Paths.PackageOutput));
 });
-gulp.task('copy-package-json', [], () => {
+gulp.task('copy-package-json', () => {
   // The repo's package.json acts as the source for the package, but we strip out a bit of info.
   return gulp.src('./package.json')
       // By convention, dependencies are those for passport-sqrl/index.ts, devDependencies for testing.
       .pipe(jsonModify({ key: 'devDependencies', value: {} }))
       .pipe(gulp.dest(Paths.PackageOutput));
 });
-gulp.task('copy-package-readme', [], () => {
+gulp.task('copy-package-readme', () => {
   // The repo's README.md is used for the package.
   return gulp.src('./README.md')
       .pipe(gulp.dest(Paths.PackageOutput));
 });
 
-gulp.task('transpile-sqrl-tests', [], () => {
+gulp.task('transpile-sqrl-tests', () => {
   return gulp.src(Paths.PassportSqrlTests + '/**/*.ts')
       .pipe(sourcemaps.init())
       .pipe(gulpTypescript.createProject('tsconfig.json')())
       .pipe(sourcemaps.write('.'))
       .pipe(gulp.dest(Paths.PassportSqrlTestsOutput));
 });
-gulp.task('copy-sqrl-tests-static-files', [], () => {
+gulp.task('copy-sqrl-tests-static-files', () => {
   return gulp.src([
       Paths.Certs + '/TestSite.FullChain.Cert.pem'  // Test site cert chain
     ])
     .pipe(gulp.dest(Paths.PassportSqrlTestsOutput));
 });
 
-gulp.task('transpile-sqrl-integration-tests', [], () => {
+gulp.task('transpile-sqrl-integration-tests', () => {
   return gulp.src(Paths.PassportSqrlIntegrationTests + '/**/*.ts')
       .pipe(sourcemaps.init())
       .pipe(gulpTypescript.createProject('tsconfig.json')())
       .pipe(sourcemaps.write('.'))
       .pipe(gulp.dest(Paths.IntegrationTestsOutput));
 });
-gulp.task('copy-sqrl-integration-tests-static-files', [], () => {
+gulp.task('copy-sqrl-integration-tests-static-files', () => {
   return gulp.src([
       Paths.Certs + '/TestSite.FullChain.Cert.pem'  // Test site cert chain
     ])
@@ -157,25 +129,25 @@ gulp.task('copy-sqrl-integration-tests-static-files', [], () => {
 });
 
 // http://andrewconnell.com/blog/running-mocha-tests-with-visual-studio-code
-gulp.task('run-passport-sqrl-unit-tests', ['transpile-main-package', 'transpile-sqrl-tests', 'copy-sqrl-tests-static-files'], () => {
+gulp.task('run-passport-sqrl-unit-tests', () => {
   return gulp.src(Paths.PassportSqrlTestsOutput + '/**/*.js', { read: false })
     .pipe(mocha({ reporter: 'spec' }));
 });
 
 // http://andrewconnell.com/blog/running-mocha-tests-with-visual-studio-code
-gulp.task('run-test-site-integration-tests', ['transpile-main-package', 'transpile-sqrl-integration-tests', 'transpile-test-site', 'copy-test-site-static-files'], () => {
+gulp.task('run-test-site-integration-tests', () => {
   return gulp.src(Paths.IntegrationTestsOutput + '/Sqrl.IntegrationTests.js', { read: false })
     .pipe(mocha({ reporter: 'spec' }));
 });
 
-gulp.task('transpile-test-site', [], () => {
+gulp.task('transpile-test-site', () => {
   return gulp.src(Paths.TestSiteRoot + '/**/*.ts')
       .pipe(sourcemaps.init())
       .pipe(gulpTypescript.createProject('tsconfig.json')())
       .pipe(sourcemaps.write('.'))
       .pipe(gulp.dest(Paths.TestSiteOutput));
 });
-gulp.task('copy-test-site-static-files', [], () => {
+gulp.task('copy-test-site-static-files', () => {
   return gulp.src([
       Paths.TestSiteRoot + '/**/*.ico',
       Paths.TestSiteRoot + '/**/*.png',
@@ -189,3 +161,33 @@ gulp.task('copy-test-site-static-files', [], () => {
     ])
     .pipe(gulp.dest(Paths.TestSiteOutput));
 });
+
+// ---------------------------------------------------------------------------
+// Primary entry point commands: Running 'gulp' cleans and runs build,
+// 'build' is an alias for 'default' and required by Visual Studio Code
+// integration.
+// ---------------------------------------------------------------------------
+gulp.task('default', gulp.series(
+  'clean',
+
+  gulp.parallel(
+    'tslint',
+    'transpile-main-package',
+    'transpile-sqrl-tests',
+    'transpile-sqrl-integration-tests',
+    'transpile-test-site',
+
+    'copy-test-site-static-files',
+    'copy-sqrl-tests-static-files',
+    'copy-sqrl-integration-tests-static-files',
+
+    'copy-package-json',
+    'copy-package-readme',
+  ),
+
+  gulp.parallel(
+    'run-passport-sqrl-unit-tests',
+    'run-test-site-integration-tests',
+  ),
+));
+gulp.task('build', gulp.series('default'));
