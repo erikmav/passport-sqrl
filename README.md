@@ -15,6 +15,10 @@ The [demo site code](https://github.com/erikma/passport-sqrl/tree/master/src/tes
 
 # Release History and Release Notes
 
+## 0.3.0 19 Mar 2020
+* Update to newer ed25519 [fork and branch](https://github.com/erikma/ed25519/tree/dev/erikmav/fixNode12) containing fixes for Node 12 and higher.
+* Update package to require Node 12 as a minimum.
+
 ## 0.2.3 16 Mar 2019
 * Update to newer ed25519 [fork](https://github.com/gaoxiangxyz/ed25519) that does not need OpenSSL to be installed locally to build. Python 2.7 still needed however.
 * You may have to force-update your "nan" package to 2.13.1 or higher by running `npm install nan@2.13.1` to get this to work. The package.json in that fork needs updating.
