@@ -1,6 +1,6 @@
 {
   "name": "passport-sqrl",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "ExpressJS and PassportJS implementation of the Secure Quick Reliable Login protocol from Gibson Research",
   "homepage": "https://github.com/erikma/passport-sqrl",
   "repository": {
@@ -36,7 +36,7 @@
     "@types/passport": "^0.3.5",
     "@types/passport-strategy": "^0.2.35",
     "base64url": "^3.0.1",
-    "ed25519": "git+https://github.com/gaoxiangxyz/ed25519.git",
+    "ed25519": "git+https://github.com/erikma/ed25519.git#dev/erikmav/fixNode12",
     "express": "^4.17.1",
     "nan": "^2.14.1",
     "passport": "^0.4.1",
@@ -91,7 +91,7 @@
     "typescript": "^3.9.7"
   },
   "engines": {
-    "node": ">= 10.15.3"
+    "node": ">= 12.0.0"
   },
   "license": "MIT"
 }
