@@ -103,7 +103,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     this.sqrlPassportStrategy = new SQRLStrategy(this.log, sqrlConfig);
     passport.use(this.sqrlPassportStrategy);
     passport.serializeUser((user: UserDBRecord, done) => done(null, user.sqrlPrimaryIdentityPublicKey));
-    passport.deserializeUser((id: any, done: (err: Error, doc: any) => void) => this.findUser(id, done));
+    passport.deserializeUser((id: any, done: (err: Error | null, doc: any) => void) => this.findUser(id, done));
 
     // Useful: http://toon.io/understanding-passportjs-authentication-flow/
     const app = express()
@@ -189,7 +189,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
                 this.log.finest(() => `pollNut: ${req.params.nut}: Nut not logged in`);
                 res.send(<NutPollResult> { loggedIn: false });
               } else {
-                this.findUser(nutRecord.clientPrimaryIdentityPublicKey, (err: Error, userDBRecord: UserDBRecord | null) => {
+                this.findUser(nutRecord.clientPrimaryIdentityPublicKey, (err: Error | null, userDBRecord: UserDBRecord | null) => {
                   if (err) {
                     this.log.debug(`pollNut: ${req.params.nut}: Error finding user: ${err}`);
                     res.statusCode = 500;
@@ -391,7 +391,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     return nutRecord;
   }
 
-  private findUser(sqrlPublicKey: string, done: (err: Error, doc: any) => void): void {
+  private findUser(sqrlPublicKey: string, done: (err: Error | null, doc: any) => void): void {
     // Treat the SQRL client's public key as a primary search key in the database.
     let userDBRecord = <UserDBRecord> {
       sqrlPrimaryIdentityPublicKey: sqrlPublicKey,
