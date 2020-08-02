@@ -36,7 +36,7 @@
     "@types/passport": "^0.3.5",
     "@types/passport-strategy": "^0.2.35",
     "base64url": "^3.0.1",
-    "ed25519": "git+https://github.com/erikma/ed25519.git#dev/erikmav/fixNode12",
+    "ed25519": "git+https://github.com/dazoe/ed25519#master",
     "express": "^4.17.1",
     "nan": "^2.14.1",
     "passport": "^0.4.1",
