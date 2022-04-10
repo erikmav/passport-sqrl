@@ -20,7 +20,7 @@ echo ==========================================================================
 echo Setting aliases for easier command line experience
 echo ==========================================================================
 echo.
-doskey /macrofile=aliases.txt
+doskey /macrofile=%~dp0aliases.txt
 doskey /macros
 
 
