@@ -3,7 +3,6 @@ import { assert } from "chai";
 import * as crypto from 'crypto';
 import * as ed25519 from 'ed25519';
 import * as fs from 'fs';
-import * as request from 'request';
 import * as requestPromise from 'request-promise-native';
 import * as url from 'url';
 import { BodyParser, ClientRequestInfo, TIFFlags } from '../passport-sqrl';

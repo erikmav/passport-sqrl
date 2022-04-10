@@ -102,7 +102,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
     // public key as the key for the user profile in back-end database storage.
     this.sqrlPassportStrategy = new SQRLStrategy(this.log, sqrlConfig);
     passport.use(this.sqrlPassportStrategy);
-    passport.serializeUser((user: UserDBRecord, done) => done(null, user.sqrlPrimaryIdentityPublicKey));
+    passport.serializeUser((user: Express.User, done) => done(undefined, (<UserDBRecord> user).sqrlPrimaryIdentityPublicKey));
     passport.deserializeUser((id: any, done: (err: Error | null, doc: any) => void) => this.findUser(id, done));
 
     // Useful: http://toon.io/understanding-passportjs-authentication-flow/
@@ -197,7 +197,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
                   } else {
                     this.log.debug(`pollNut: ${req.params.nut}: Nut logged in, logging user in via PassportJS`);
                     // Ensure the cookie header for the response is set the way Passport normally does it.
-                    req.login(userDBRecord, loginErr => {
+                    req.login(<UserDBRecord> userDBRecord, loginErr => {
                       if (loginErr) {
                         this.log.debug(`pollNut: ${req.params.nut}: PassportJS login failed: ${loginErr}`);
                         res.statusCode = 400;
@@ -235,8 +235,8 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
         } else {
           res.render('index', {
             subpageName: 'Main',
-            username: req.user.name,
-            sqrlPublicKey: req.user.sqrlPrimaryIdentityPublicKey
+            username: (<UserDBRecord> req.user).name,
+            sqrlPublicKey: (<UserDBRecord> req.user).sqrlPrimaryIdentityPublicKey
           });
         }
       })
@@ -488,7 +488,7 @@ export class TestSiteHandler implements ISQRLIdentityStorage {
  * using the 'sqrl' prefix to differentiate from any other user fields
  * for the app.
  */
-class UserDBRecord {
+class UserDBRecord implements Express.User {
   public static newFromClientRequestInfo(clientRequestInfo: ClientRequestInfo): UserDBRecord {
     let result = <UserDBRecord> {
       sqrlPrimaryIdentityPublicKey: clientRequestInfo.primaryIdentityPublicKey,
